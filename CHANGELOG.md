@@ -6,7 +6,7 @@
 
 ## 0.1.0
 
-First release. Extracted from the agentic delivery workflow built for the Pocket Customer app, and generalised away from Flutter.
+First release. Extracted from the agentic delivery workflow built and used to deliver apps in production, and generalised away from Flutter.
 
 - **Workflow.** `requirements → specification → tickets → implementation → review → complete`, one plan per feature, committed to the repository.
 - **Delivery board.** A Markdown feature register joined with Git claims: a pushed branch claims a row, a completed plan on the default branch marks it done, and dependencies, human gates and product decisions derive the blocked state.

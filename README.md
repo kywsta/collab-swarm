@@ -227,7 +227,7 @@ Node 20.11 or newer, and Git. One runtime dependency (`yaml`).
 
 ## Credits
 
-Extracted from the agentic delivery workflow built for the Pocket Customer app. The `tdd`, `codebase-design`, `domain-modeling` and `writing-for-agents` skills build on ideas from Kent Beck, John Ousterhout's *A Philosophy of Software Design*, Michael Feathers' seams, Eric Evans' domain-driven design, and Martin Fowler's refactoring catalogue.
+The `tdd`, `codebase-design`, `domain-modeling` and `writing-for-agents` skills build on ideas from Kent Beck, John Ousterhout's *A Philosophy of Software Design*, Michael Feathers' seams, Eric Evans' domain-driven design, and Martin Fowler's refactoring catalogue.
 
 ## License
 
