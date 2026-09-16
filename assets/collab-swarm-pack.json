@@ -1,0 +1,22 @@
+{
+  "name": "core",
+  "title": "collab-swarm core",
+  "description": "The language-agnostic delivery workflow: plan a feature from its sources, split it into vertical tickets, build each test-first, review the whole diff.",
+  "collabSwarm": 1,
+  "skills": [
+    { "name": "deliver-change", "role": "coordinator" },
+    { "name": "to-requirements", "role": "stage" },
+    { "name": "to-spec", "role": "stage" },
+    { "name": "to-tickets", "role": "stage" },
+    { "name": "implement", "role": "stage" },
+    { "name": "code-review", "role": "stage" },
+    { "name": "whats-next", "role": "stage" },
+    { "name": "tdd", "role": "ticket" },
+    { "name": "codebase-design", "role": "reference" },
+    { "name": "domain-modeling", "role": "reference" },
+    { "name": "writing-for-agents", "role": "reference" },
+    { "name": "resolving-merge-conflicts", "role": "reference" },
+    { "name": "wizard", "role": "reference" }
+  ],
+  "checks": []
+}

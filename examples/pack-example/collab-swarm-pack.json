@@ -1,0 +1,10 @@
+{
+  "name": "example",
+  "title": "Example skill pack",
+  "description": "A minimal pack showing the three things a pack contributes: a ticket skill, a path-scoped rule, and suggested checks.",
+  "collabSwarm": 1,
+  "skills": [{ "name": "http-endpoint", "role": "ticket" }],
+  "checks": [
+    { "name": "contract-test", "run": "npm run test:contract --if-present" }
+  ]
+}

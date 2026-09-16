@@ -1,0 +1,29 @@
+{
+  "name": "collab-swarm",
+  "version": "0.1.0",
+  "description": "Spec-driven delivery workflow for humans and coding agents working as a swarm. Language and framework agnostic.",
+  "keywords": ["agents", "ai", "claude-code", "codex", "cursor", "opencode", "antigravity", "skills", "workflow", "spec-driven", "tdd"],
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=20.11" },
+  "bin": { "collab-swarm": "dist/cli.js", "cswarm": "dist/cli.js" },
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "assets", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "npm run build && node --test test/*.test.js",
+    "check": "npm run build && node --test test/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}
