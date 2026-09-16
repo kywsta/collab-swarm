@@ -65,7 +65,7 @@ Packs may not add `coordinator` or `stage` skills that replace the core ones; a 
 
 ### Checks
 
-Checks are *suggested*, not imposed: `collab-swarm add` shows them and asks before appending to `collab-swarm.yml`. A check whose `name` the project already uses is skipped, so a pack never silently replaces a command the team tuned.
+Checks are *suggested*, not imposed: `swarm add` shows them and asks before appending to `collab-swarm.yml`. A check whose `name` the project already uses is skipped, so a pack never silently replaces a command the team tuned.
 
 Fields: `run` (required), `name`, `focus` (`{path}` is substituted by `check --focus`), `ci` (used by `check --ci`), and `when` (a path that must exist for the check to run).
 
@@ -115,9 +115,9 @@ Recipe: [`http-endpoint`](../skills/http-endpoint/SKILL.md).
 
 ```bash
 # From a scratch repository with collab-swarm already installed:
-npx collab-swarm add ../path/to/your-pack
-npx collab-swarm packs          # roles and rule scopes, as installed
-npx collab-swarm validate       # a ticket may now name your ticket skills
+npx swarm add ../path/to/your-pack
+npx swarm packs          # roles and rule scopes, as installed
+npx swarm validate       # a ticket may now name your ticket skills
 ```
 
 Confirm three things:
@@ -132,10 +132,10 @@ Name the package `collab-swarm-pack-<name>` (or scope it, `@acme/collab-swarm-pa
 
 ```bash
 npm install -D collab-swarm-pack-go
-npx collab-swarm add collab-swarm-pack-go
+npx swarm add collab-swarm-pack-go
 ```
 
-The pack spec is recorded in `collab-swarm.yml`, so a teammate's `npm install && npx collab-swarm sync` reproduces the same agent files exactly.
+The pack spec is recorded in `collab-swarm.yml`, so a teammate's `npm install && npx swarm sync` reproduces the same agent files exactly.
 
 ## Porting an existing skill set
 
@@ -144,5 +144,5 @@ If you already have skills in `.claude/skills/`, a pack is mostly a move:
 1. Copy the skill directories into `skills/`.
 2. Write the manifest, assigning a role to each.
 3. Replace every repository-specific path with the source kind it stands for (`docs/prd/**` becomes "the project's product source").
-4. Replace project-specific commands with `npx collab-swarm check`.
+4. Replace project-specific commands with `npx swarm check`.
 5. Move the always-on invariants into `rules/`, scoped with `paths`.

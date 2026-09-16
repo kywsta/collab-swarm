@@ -15,7 +15,7 @@ Done when the ticket has one concrete outcome and no unresolved prerequisite.
 
 ## 2. Build in red-green slices
 
-Use `tdd` for each changed behaviour. Before editing a concern, read the skill that owns it: the ticket's `skills` list is the plan, and `npx collab-swarm packs` names the rest if the diff reaches a concern the ticket did not anticipate. Run the smallest relevant test after each slice. Change annotated sources before regenerating their outputs.
+Use `tdd` for each changed behaviour. Before editing a concern, read the skill that owns it: the ticket's `skills` list is the plan, and `npx swarm packs` names the rest if the diff reaches a concern the ticket did not anticipate. Run the smallest relevant test after each slice. Change annotated sources before regenerating their outputs.
 
 Documentation, generated output, mechanical configuration, and visual-only token changes may skip a new failing test when the ticket records why and another check demonstrates correctness.
 
@@ -26,7 +26,7 @@ Done when the ticket's behaviour is observable through the specification's publi
 Run the [project checks](../../workflow/WORKFLOW.md#project-checks):
 
 ```bash
-npx collab-swarm check --focus <ticket test path>
+npx swarm check --focus <ticket test path>
 ```
 
 It runs the project's configured commands in order and validates the plan. Then inspect the diff for unrelated changes, hand-edited generated files, secrets, and missed documentation.

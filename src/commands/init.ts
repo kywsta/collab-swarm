@@ -272,7 +272,7 @@ function applyAndReport(root: string, config: Config, _args: Args, fresh = false
     out('');
   }
   out(`  Ask your agent: ${style.bold('"What\'s next?"')} or ${style.bold('"Make a plan to implement <feature>"')}`);
-  out(style.dim(`  Add a framework pack later: npx collab-swarm add <pack>`));
+  out(style.dim(`  Add a framework pack later: npx swarm add <pack>`));
   return 0;
 }
 

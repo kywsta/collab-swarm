@@ -7,7 +7,7 @@ import { buildBoard } from './board.js';
 export async function run(args: Args): Promise<number> {
   const slug = args.positional[0];
   if (!slug) {
-    throw new CliError('Name the row to claim.', 64, 'Usage: collab-swarm claim <slug>');
+    throw new CliError('Name the row to claim.', 64, 'Usage: swarm claim <slug>');
   }
 
   const { config, root } = loadConfig();

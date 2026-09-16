@@ -62,10 +62,10 @@ export const flagString = (args: Args, name: string): string | null => {
 
 export const flagBool = (args: Args, name: string): boolean => args.flags.has(name);
 
-const HELP = `${style.bold('collab-swarm')} — spec-driven delivery for humans and coding agents.
+const HELP = `${style.bold('swarm')} — spec-driven delivery for humans and coding agents.
 
 ${style.bold('Usage')}
-  collab-swarm <command> [options]
+  swarm <command> [options]
 
 ${style.bold('Set up')}
   init                     Install the workflow into this repository
@@ -122,7 +122,7 @@ async function dispatch(args: Args): Promise<number> {
       throw new CliError(
         `Unknown command "${args.command}".`,
         64,
-        'Run `collab-swarm help` to see the commands.',
+        'Run `swarm help` to see the commands.',
       );
   }
 }

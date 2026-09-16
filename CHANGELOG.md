@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The CLI command is now `swarm` (was `collab-swarm`). The npm package, config files, and GitHub repository remain `collab-swarm`. The `cswarm` alias is unchanged.
+
 ## 0.1.0
 
 First release. Extracted from the agentic delivery workflow built for the Pocket Customer app, and generalised away from Flutter.

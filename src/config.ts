@@ -174,7 +174,7 @@ export function serializeConfig(config: Config): string {
 
   return [
     '# collab-swarm — how humans and agents deliver features in this repository.',
-    '# Regenerate the agent files after editing: npx collab-swarm sync',
+    '# Regenerate the agent files after editing: npx swarm sync',
     '',
     toYaml(body).trimEnd(),
     '',
@@ -198,7 +198,7 @@ export function loadConfig(from = process.cwd()): LoadedConfig {
     throw new CliError(
       `No ${CONFIG_FILE} found in this directory or any parent.`,
       1,
-      'Run `npx collab-swarm init` in the repository root.',
+      'Run `npx swarm init` in the repository root.',
     );
   }
   const file = join(root, CONFIG_FILE);

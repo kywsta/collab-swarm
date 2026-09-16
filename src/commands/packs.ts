@@ -46,6 +46,6 @@ export async function run(args: Args): Promise<number> {
 
   out('');
   out(style.dim(`  ${set.skills.length} skills and ${set.rules.length} rules across ${set.packs.length} pack(s).`));
-  out(style.dim('  Add another: npx collab-swarm add <npm-package|path>'));
+  out(style.dim('  Add another: npx swarm add <npm-package|path>'));
   return 0;
 }

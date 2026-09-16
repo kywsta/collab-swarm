@@ -62,7 +62,7 @@ skills: [tdd]
 
 Ticket filenames and dependency values are kebab-case slugs. Ticket statuses are `planned`, `in-progress`, `blocked`, `deferred`, and `done`. The body contains `Outcome`, `Requirements`, `Implementation`, `Tests`, and `Done when` sections; a `deferred` ticket adds `## Deferred` naming the gate it waits for, and a `blocked` ticket adds `## Blocked` naming the decision it needs.
 
-`skills` lists only skills whose role is *implements a ticket*. Run `npx collab-swarm packs` to see them; the validator rejects anything else.
+`skills` lists only skills whose role is *implements a ticket*. Run `npx swarm packs` to see them; the validator rejects anything else.
 
 ## History and verification
 
