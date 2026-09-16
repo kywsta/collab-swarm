@@ -91,7 +91,7 @@ Tickets link to named requirements and specification sections where useful. Each
 
 Dependencies use ticket slugs. The graph must be acyclic, and a ticket starts only when its dependencies are done. Prefer a short sequential list over an elaborate graph unless the feature is genuinely parallel.
 
-`skills` may name only skills whose role is *implements a ticket*. `npx collab-swarm packs` lists them, and the validator rejects any other name — coordination and reference skills are reached by reading them, not by scheduling them.
+`skills` may name only skills whose role is *implements a ticket*. `npx swarm packs` lists them, and the validator rejects any other name — coordination and reference skills are reached by reading them, not by scheduling them.
 
 A ticket that waits on an external gate the feature can ship without (an API another team owes, a third-party account) is `deferred`, with a `## Deferred` section naming what it waits for and who owns it. Deferred tickets do not block review or completion and are reopened as `planned` when the gate closes. `blocked` is for a ticket that stops the feature until the user decides; it records the decision it needs under `## Blocked`.
 
@@ -99,20 +99,20 @@ A ticket that waits on an external gate the feature can ship without (an API ano
 
 Changed behaviour starts with a failing test at a public boundary named in the specification's test plan. Use `tdd` for the loop, and the smallest set of concern skills each slice needs.
 
-Which concern skills exist depends on the installed packs. Read the ticket's `skills` list, and consult `npx collab-swarm packs` when a slice touches a concern the ticket did not anticipate. Generated files remain machine-owned: change the annotated source, then regenerate.
+Which concern skills exist depends on the installed packs. Read the ticket's `skills` list, and consult `npx swarm packs` when a slice touches a concern the ticket did not anticipate. Generated files remain machine-owned: change the annotated source, then regenerate.
 
 ## Project checks
 
 One command set, run from the repository root through one command. The commands live under `checks:` in `collab-swarm.yml`, so a human, an agent and CI run exactly the same set.
 
 ```bash
-npx collab-swarm check                       # full set
-npx collab-swarm check --focus <test path>   # ticket verification
-npx collab-swarm check --ci                  # verify formatting instead of rewriting it
-npx collab-swarm check --only test           # one named check
+npx swarm check                       # full set
+npx swarm check --focus <test path>   # ticket verification
+npx swarm check --ci                  # verify formatting instead of rewriting it
+npx swarm check --only test           # one named check
 ```
 
-A ticket runs it with a focused test path; completion and cross-cutting work run the full set. `npx collab-swarm validate` checks the workflow contract and every plan, and belongs in the same set.
+A ticket runs it with a focused test path; completion and cross-cutting work run the full set. `npx swarm validate` checks the workflow contract and every plan, and belongs in the same set.
 
 ## Review and completion
 
@@ -146,7 +146,7 @@ A plan presentation, before and after:
 
 > Sources. The analytics requirements: their acceptance criteria, the browsing events, the defects in what fires today, and the data and privacy rules, plus the delivery plan's principle that analytics is designed in from the first milestone. Nothing from the design index or the API contract, since the feature renders nothing and events leave through adapters that arrive with the account and measurement milestone. Open questions. Product has not yet said which unmeasured metrics the rewrite must instrument (D6); the plan builds on the developers' working assumption, the current taxonomy, so a different answer changes one routing row or one key. I added a question to the decisions register (D22): the requirements require failure events but never say which event family they belong to. It does not block this port, and Product must answer it before the instrumentation feature names its first failure event.
 
-The names come from the sources themselves: a document's title and headings, the decisions register's question column, the gate tracker's title and owner cells, the milestone headings in the delivery plan, and ticket titles. `npx collab-swarm status` already prints them beside each id. Plan documents keep citing path, heading, and decision id, because they are looked up later; this section governs what is said to the user.
+The names come from the sources themselves: a document's title and headings, the decisions register's question column, the gate tracker's title and owner cells, the milestone headings in the delivery plan, and ticket titles. `npx swarm status` already prints them beside each id. Plan documents keep citing path, heading, and decision id, because they are looked up later; this section governs what is said to the user.
 
 ## Escalation
 
@@ -154,4 +154,4 @@ Stop and ask the user when progress requires new product behaviour, conflicting 
 
 ## Validation
 
-Run `npx collab-swarm validate` after creating or changing a plan and before reporting completion. Validation checks package shape, required sections, ticket dependencies, statuses, and skill names. It deliberately does not recreate human traceability or evidence bureaucracy: no approval hashes, revision copies, event logs, attempt leases, traceability matrices, or evidence directories.
+Run `npx swarm validate` after creating or changing a plan and before reporting completion. Validation checks package shape, required sections, ticket dependencies, statuses, and skill names. It deliberately does not recreate human traceability or evidence bureaucracy: no approval hashes, revision copies, event logs, attempt leases, traceability matrices, or evidence directories.

@@ -24,7 +24,7 @@ export async function run(args: Args): Promise<number> {
     for (const file of updates) out(`  ${style.yellow('~')} ${file.path}`);
     for (const path of plan.stale) out(`  ${style.red('-')} ${path} ${style.dim('(no longer emitted)')}`);
     for (const file of drifted) out(`  ${style.red('!')} ${file.path} ${style.dim('(edited locally)')}`);
-    fail('Run `npx collab-swarm sync` to bring them up to date.');
+    fail('Run `npx swarm sync` to bring them up to date.');
     return 1;
   }
 

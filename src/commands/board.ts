@@ -65,7 +65,7 @@ export async function run(args: Args): Promise<number> {
     return 0;
   }
 
-  const options = { lane, count, claimCommand: 'npx collab-swarm claim <slug>' };
+  const options = { lane, count, claimCommand: 'npx swarm claim <slug>' };
   out('');
   out(args.command === 'status' ? renderStatus(board, options) : renderNext(board, options));
   out('');

@@ -7,7 +7,8 @@ A team of people and a swarm of agents share one backlog, one plan format, and o
 Language and framework agnostic. Framework skills are added as packs.
 
 ```bash
-npx collab-swarm init
+npm install -D collab-swarm
+npx swarm init
 ```
 
 ---
@@ -49,7 +50,7 @@ Two people and four agent sessions on one repository will, by default, plan the 
 - **Blocked is derived, not declared.** A row waiting on an unfinished dependency, an open human gate, or an unanswered product decision is never offered to anyone.
 
 ```console
-$ npx collab-swarm status
+$ npx swarm status
 
 Delivery board · 2026-09-16 · milestone M0 Foundation · 1 done · 1 in progress · 3 available · 1 blocked
 
@@ -62,7 +63,7 @@ Next up
 1. password-recovery — Reset a forgotten PIN by email · M1 Entry · Dev 1 · S · unblocks 0
 2. guest-prices — Show list prices to a signed-out visitor · M1 Entry · Dev 2 · S · rides on the answer to D2 (Should a guest see prices before signing in?)
 3. pin-sign-in — Sign in with a mobile number and PIN · M1 Entry · Dev 1 · M · rides on G2 Customer API contract (decided: mock-first)
-Claim one: npx collab-swarm claim <slug>
+Claim one: npx swarm claim <slug>
 ```
 
 ## Works with the agent you already use
@@ -122,24 +123,24 @@ git: { remote: origin, defaultBranch: main, branchPrefix: "feat/" }
 packs: []
 ```
 
-`init` detects your ecosystem (Node, Python, Go, Rust, Flutter/Dart) and prefills `checks`, and detects common source locations. Edit it, run `npx collab-swarm sync`, and every agent's instructions are regenerated.
+`init` detects your ecosystem (Node, Python, Go, Rust, Flutter/Dart) and prefills `checks`, and detects common source locations. Edit it, run `npx swarm sync`, and every agent's instructions are regenerated.
 
 ## Commands
 
 ```bash
-npx collab-swarm init                    # install into this repository
-npx collab-swarm sync [--check|--force]  # re-apply after an upgrade; --check fails CI when stale
-npx collab-swarm add <pack>              # attach a language or framework skill pack
-npx collab-swarm packs                   # what each installed pack contributes
+npx swarm init                    # install into this repository
+npx swarm sync [--check|--force]  # re-apply after an upgrade; --check fails CI when stale
+npx swarm add <pack>              # attach a language or framework skill pack
+npx swarm packs                   # what each installed pack contributes
 
-npx collab-swarm status [--lane <lane>]  # the board: done, in progress, available, blocked
-npx collab-swarm next [--lane <lane>]    # the best unclaimed rows, ranked
-npx collab-swarm claim <slug>            # take a row: pushes its branch with a plan skeleton
-npx collab-swarm plan <slug>             # scaffold a plan package by hand
+npx swarm status [--lane <lane>]  # the board: done, in progress, available, blocked
+npx swarm next [--lane <lane>]    # the best unclaimed rows, ranked
+npx swarm claim <slug>            # take a row: pushes its branch with a plan skeleton
+npx swarm plan <slug>             # scaffold a plan package by hand
 
-npx collab-swarm validate                # the workflow contract and every plan
-npx collab-swarm check [--focus <path>]  # your configured checks, in order
-npx collab-swarm doctor                  # what is installed, stale, or missing
+npx swarm validate                # the workflow contract and every plan
+npx swarm check [--focus <path>]  # your configured checks, in order
+npx swarm doctor                  # what is installed, stale, or missing
 ```
 
 `status`, `next`, `packs` and `validate` accept `--json`.
@@ -171,7 +172,7 @@ The core workflow knows nothing about your stack. A pack adds what does: concern
 
 ```bash
 npm install -D collab-swarm-pack-go
-npx collab-swarm add collab-swarm-pack-go
+npx swarm add collab-swarm-pack-go
 ```
 
 A pack is a directory with a manifest, a `skills/` folder, and optionally `rules/`:
@@ -204,7 +205,7 @@ collab-swarm-pack-go/
 - a file an **older version wrote** that is no longer emitted — removed, along with any directory it emptied;
 - everything else — rewritten.
 
-Add `npx collab-swarm sync --check` and `npx collab-swarm validate` to CI to catch a stale or invalid checkout.
+Add `npx swarm sync --check` and `npx swarm validate` to CI to catch a stale or invalid checkout.
 
 ## Programmatic use
 

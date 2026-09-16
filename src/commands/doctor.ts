@@ -53,7 +53,7 @@ export async function run(_args: Args): Promise<number> {
     say(
       'warn',
       `${pending.length + plan.stale.length} agent file(s) out of date`,
-      'Run: npx collab-swarm sync',
+      'Run: npx swarm sync',
     );
   }
   if (drifted.length > 0) {
@@ -93,10 +93,10 @@ export async function run(_args: Args): Promise<number> {
   if (findings.ok) {
     say('ok', `${plans.length} plan(s) valid`);
   } else {
-    say('fail', `${findings.errors.length} validation error(s)`, 'Run: npx collab-swarm validate');
+    say('fail', `${findings.errors.length} validation error(s)`, 'Run: npx swarm validate');
   }
 
-  heading('collab-swarm doctor');
+  heading('swarm doctor');
   for (const line of lines) {
     out(`  ${MARK[line.level]} ${line.text}`);
     if (line.hint) out(`    ${style.dim(line.hint)}`);

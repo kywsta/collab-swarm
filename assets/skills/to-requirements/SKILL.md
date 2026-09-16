@@ -44,6 +44,6 @@ Done when a developer can explain what to build, which designs to open, which op
 
 ## 3. Hand back
 
-Write `<plans>/<feature-slug>/requirements.md`. Report readiness and any blocking questions to `deliver-change` in [plain names](../../workflow/WORKFLOW.md#plain-names): each question as the question itself, each source as its heading, each gate as what it waits for and who owns it. `deliver-change` records the plan stage and status. Run `npx collab-swarm validate`.
+Write `<plans>/<feature-slug>/requirements.md`. Report readiness and any blocking questions to `deliver-change` in [plain names](../../workflow/WORKFLOW.md#plain-names): each question as the question itself, each source as its heading, each gate as what it waits for and who owns it. `deliver-change` records the plan stage and status. Run `npx swarm validate`.
 
 Done when the file validates and contains no unresolved placeholder or implicit product decision.

@@ -13,7 +13,7 @@ export async function run(args: Args): Promise<number> {
     throw new CliError(
       'Name the pack to add.',
       64,
-      'Usage: collab-swarm add <npm-package|path> — for example `collab-swarm add ./packs/go`.',
+      'Usage: swarm add <npm-package|path> — for example `swarm add ./packs/go`.',
     );
   }
 

@@ -74,8 +74,8 @@ const claudeSettings = (context: EmitContext) =>
       $schema: 'https://json.schemastore.org/claude-code-settings.json',
       permissions: {
         allow: [
-          'Bash(npx collab-swarm:*)',
-          'Bash(collab-swarm:*)',
+          'Bash(npx swarm:*)',
+          'Bash(swarm:*)',
           'Bash(git status:*)',
           'Bash(git diff:*)',
           'Bash(git log:*)',

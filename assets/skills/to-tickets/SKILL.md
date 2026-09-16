@@ -19,7 +19,7 @@ Done when each ticket has a visible result and the set covers the complete featu
 
 Use ticket slugs in `depends_on`. Prefer a simple sequence. Add parallel branches only when tickets are truly independent. Reject cycles, horizontal layer batches, duplicate work, and oversized tickets.
 
-Choose the smallest applicable skill list. Behavioural tickets normally include `tdd` plus the concern skills the slice touches. Run `npx collab-swarm packs` to see which skills a ticket may name: only those whose role is *implements a ticket*. Coordination skills and reference skills such as `codebase-design` and `domain-modeling` are read when needed, never listed here.
+Choose the smallest applicable skill list. Behavioural tickets normally include `tdd` plus the concern skills the slice touches. Run `npx swarm packs` to see which skills a ticket may name: only those whose role is *implements a ticket*. Coordination skills and reference skills such as `codebase-design` and `domain-modeling` are read when needed, never listed here.
 
 Done when at least one ticket can start and every dependency represents a real implementation prerequisite.
 
@@ -29,6 +29,6 @@ Write one file per ticket under `<plans>/<feature-slug>/tickets/` with `status: 
 
 When the requirements record a missing external dependency, plan the feature on a deterministic stand-in and add one `connect-<feature-slug>-<dependency>` ticket with `status: deferred` and a `## Deferred` section naming what it waits for and who owns it. A deferred ticket does not block review or completion; it is reopened as `planned` when the dependency arrives.
 
-Report readiness to `deliver-change`; it sets `stage: tickets` and `status: ready`. Run `npx collab-swarm validate` and present the ticket order by descriptive title, dependencies, and outcome, in [plain names](../../workflow/WORKFLOW.md#plain-names); a deferred ticket says what it waits for and who owns it, such as "the customer API contract from Backend".
+Report readiness to `deliver-change`; it sets `stage: tickets` and `status: ready`. Run `npx swarm validate` and present the ticket order by descriptive title, dependencies, and outcome, in [plain names](../../workflow/WORKFLOW.md#plain-names); a deferred ticket says what it waits for and who owns it, such as "the customer API contract from Backend".
 
 Done when the complete plan is readable, valid, and ready for the user's implementation instruction.

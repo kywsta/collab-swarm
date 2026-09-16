@@ -15,7 +15,7 @@ Done when technical design can proceed without guessing product intent.
 
 ## 2. Design the implementation
 
-Prefer the deep modules and boundaries the codebase already has over new ones. Read the relevant concern skills of the installed packs before deciding a concern they own — `npx collab-swarm packs` lists them — so the specification and the implementation use the same vocabulary.
+Prefer the deep modules and boundaries the codebase already has over new ones. Read the relevant concern skills of the installed packs before deciding a concern they own — `npx swarm packs` lists them — so the specification and the implementation use the same vocabulary.
 
 For an operation the requirements recorded as missing, map the types and the deterministic stand-in to the shape the feature will build against, including its error cases.
 
@@ -33,6 +33,6 @@ Done when TDD can start at clear public boundaries and every acceptance criterio
 
 ## 4. Hand back
 
-Write `<plans>/<feature-slug>/specification.md`. Report readiness to `deliver-change`; it records the plan stage. Run `npx collab-swarm validate`.
+Write `<plans>/<feature-slug>/specification.md`. Report readiness to `deliver-change`; it records the plan stage. Run `npx swarm validate`.
 
 Done when the specification validates and is concrete enough to split into vertical tickets.

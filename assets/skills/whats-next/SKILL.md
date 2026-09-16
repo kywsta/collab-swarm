@@ -9,15 +9,15 @@ Answer two questions about the delivery plan without the human reading it: **how
 
 The feature register in the project's backlog file is the list of work, and Git is the tracker: a branch named for a row is the **claim** on it, and that row's plan complete on the default branch is **done**. Nothing outside the repository records state, so every developer and every agent sees the same board after one fetch.
 
-The mechanics live in `npx collab-swarm`; this skill runs them and presents the result. It writes no feature code: a claimed row goes to `deliver-change`.
+The mechanics live in `npx swarm`; this skill runs them and presents the result. It writes no feature code: a claimed row goes to `deliver-change`.
 
 ## 1. Read the board
 
 Run one command from the repository root:
 
 ```bash
-npx collab-swarm status              # "How's it going?" — counts, claims, gates, then the top three
-npx collab-swarm next --lane "Dev 2" # "What's next?" — only the top three, the asker's lane first
+npx swarm status              # "How's it going?" — counts, claims, gates, then the top three
+npx swarm next --lane "Dev 2" # "What's next?" — only the top three, the asker's lane first
 ```
 
 Both fetch the remote with prune first; add `--no-fetch` offline. Pass `--lane` when the user names their lane ("I'm Dev 2", "I'm on backend"); otherwise leave it out and each proposal shows its own lane.
@@ -44,7 +44,7 @@ Done when the user can choose by reading three bullets that make sense without t
 When the user picks a row ("start 2", "let's do guest-home", "I'll take it"), the working tree must be clean; then:
 
 ```bash
-npx collab-swarm claim <slug>
+npx swarm claim <slug>
 ```
 
 The tool re-fetches, refuses a row that is claimed, done, blocked, or unknown (relay its reason and offer the next proposal), creates the claim branch from the default branch, commits the plan skeleton at stage `requirements`, and pushes. A rejected push means another developer won the race: the tool restores the checkout and names the winner.
