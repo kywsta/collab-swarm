@@ -111,20 +111,24 @@ Recipe: [`http-endpoint`](../skills/http-endpoint/SKILL.md).
 
 `paths` is required and must match something. The emitter translates it per target: Claude Code keeps `paths`, Cursor gets `globs` plus `alwaysApply`, and links to the workflow documents are repointed so they resolve from wherever that target keeps its rules.
 
+Keep the `Recipe:` link to the skill that satisfies the rule. It is how a reader gets from the invariant to the procedure, and `npx swarm steps` reads it too: a rule that links to a skill is reported as in force for every step of it, which is the only way an invariant scoped to source files can be tied to the work that writes them.
+
 ## Testing a pack
 
 ```bash
 # From a scratch repository with collab-swarm already installed:
 npx swarm add ../path/to/your-pack
 npx swarm packs          # roles and rule scopes, as installed
+npx swarm steps <skill>  # your steps, their completion criteria, and the rules in force
 npx swarm validate       # a ticket may now name your ticket skills
 ```
 
-Confirm three things:
+Confirm four things:
 
 1. Your ticket skills appear under *implements a ticket* in `packs` output and in the generated `AGENTS.md`.
 2. A ticket naming one of them validates; a ticket naming a reference skill does not.
-3. Every link in your `SKILL.md` and rule resolves from its published location, in each target you support.
+3. `steps` reads back the sequence you wrote, every step closing on a completion criterion, and `steps --rules` shows your rule in force where you meant it. A step that reports no criterion is usually one that never stated one.
+4. Every link in your `SKILL.md` and rule resolves from its published location, in each target you support.
 
 ## Publishing
 

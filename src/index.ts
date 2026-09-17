@@ -51,8 +51,24 @@ export {
   type RegisterRow,
 } from './core/register.js';
 export { renderNext, renderStatus } from './core/render.js';
+export {
+  FEATURE,
+  buildStepMap,
+  readSkillMap,
+  resolveArtifact,
+  rulesAtStep,
+  type AppliedRule,
+  type RuleCoverage,
+  type RuleReason,
+  type RuleSite,
+  type SkillMap,
+  type Step,
+  type StepMap,
+  type StepMapOptions,
+} from './core/steps.js';
 export { Findings, validatePlan, validateRepository, type Finding } from './core/validate.js';
 export {
+  ROLE_LABEL,
   assetsDir,
   corePack,
   loadPack,

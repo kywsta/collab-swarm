@@ -1,14 +1,7 @@
 import { flagBool, type Args } from '../cli.js';
 import { loadConfig } from '../config.js';
-import { loadPacks, type SkillRole } from '../packs.js';
+import { ROLE_LABEL, loadPacks } from '../packs.js';
 import { heading, out, style } from '../util/log.js';
-
-const ROLE_LABEL: Record<SkillRole, string> = {
-  coordinator: 'coordinates a feature',
-  stage: 'runs one stage',
-  ticket: 'implements a ticket',
-  reference: 'consulted, never scheduled',
-};
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();

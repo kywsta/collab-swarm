@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`swarm steps`.** The installed skills, read back as an execution map: the sequence each one runs, what finishes each step, which skill it hands work to, which `swarm` commands and plan files it touches, and which rules are in force while it runs. `steps <skill>` opens one in full; `steps --rules` inverts the view to show every step a rule governs and the file that brought it into force. Derived from the payload in the checkout — nothing is recorded, and the workflow still keeps no event log.
 - The CLI command is now `swarm` (was `collab-swarm`). The npm package, config files, and GitHub repository remain `collab-swarm`. The `cswarm` alias is unchanged.
 
 ## 0.1.0

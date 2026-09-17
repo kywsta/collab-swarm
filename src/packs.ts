@@ -29,6 +29,14 @@ export const MANIFEST_FILE = 'collab-swarm-pack.json';
 export type SkillRole = 'coordinator' | 'stage' | 'ticket' | 'reference';
 export const SKILL_ROLES: SkillRole[] = ['coordinator', 'stage', 'ticket', 'reference'];
 
+/** How a role is named to a human, in `packs` and `steps`. */
+export const ROLE_LABEL: Record<SkillRole, string> = {
+  coordinator: 'coordinates a feature',
+  stage: 'runs one stage',
+  ticket: 'implements a ticket',
+  reference: 'consulted, never scheduled',
+};
+
 export interface SkillEntry {
   name: string;
   role: SkillRole;

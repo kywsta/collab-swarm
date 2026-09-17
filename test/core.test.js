@@ -10,6 +10,8 @@ import { Register } from '../dist/core/register.js';
 import { renderNext, renderStatus } from '../dist/core/render.js';
 import { Findings, validatePlan } from '../dist/core/validate.js';
 import { corePack, loadPacks, ticketSkills } from '../dist/packs.js';
+import { buildStepMap, resolveArtifact, rulesAtStep } from '../dist/core/steps.js';
+import { firstMatch, matchesGlob } from '../dist/util/glob.js';
 import { parseConfig, serializeConfig } from '../dist/config.js';
 import { mergeBlock, BLOCK_END, BLOCK_START } from '../dist/targets/memory.js';
 import { writeText } from '../dist/util/fs.js';
@@ -463,5 +465,137 @@ describe('argument parsing', () => {
   it('accepts --flag=value', () => {
     const args = parseArgs(['check', '--focus=test/features/auth']);
     assert.equal(args.flags.get('focus'), 'test/features/auth');
+  });
+});
+
+describe('glob', () => {
+  it('spans directories with ** and stays in one segment with *', () => {
+    assert.ok(matchesGlob('.docs/changes/pin-sign-in/plan.yml', '.docs/changes/**'));
+    assert.ok(matchesGlob('src/api/v2/routes/user.ts', 'src/**/routes/**'));
+    assert.ok(matchesGlob('src/routes/user.ts', 'src/**/routes/**'));
+    assert.ok(matchesGlob('docs/prd/01-auth.md', 'docs/prd/**/*.md'));
+    assert.ok(!matchesGlob('docs/changes/x/plan.yml', '.docs/changes/**'));
+    assert.ok(!matchesGlob('src/routes/deep/user.ts', 'src/routes/*.ts'));
+  });
+
+  it('reports which pattern matched, so a rule can say why it applied', () => {
+    assert.equal(firstMatch('docs/changes/x/plan.yml', ['.docs/changes/**', 'docs/changes/**']), 'docs/changes/**');
+    assert.equal(firstMatch('src/main.ts', ['docs/**']), null);
+  });
+});
+
+describe('step map', () => {
+  const packs = loadPacks(process.cwd(), ['examples/pack-example']);
+  const map = buildStepMap(packs, { plansDir: '.docs/changes' });
+  const skill = (name) => map.skills.find((entry) => entry.name === name);
+
+  it('reads the numbered sequence and its completion criteria', () => {
+    const steps = skill('deliver-change').steps;
+    assert.deepEqual(
+      steps.map((step) => step.number),
+      [1, 2, 3, 4, 5],
+    );
+    assert.equal(steps[0].title, 'Open the plan');
+    assert.equal(steps[0].doneWhen, 'one package owns the feature and its current stage is known');
+  });
+
+  it('follows delegation but not a handback, so the call graph is the real one', () => {
+    const deliver = skill('deliver-change').steps;
+    // "Use `to-requirements` to write…" is a delegation, in the order named.
+    assert.deepEqual(deliver[1].calls, ['to-requirements', 'to-spec', 'to-tickets']);
+    assert.deepEqual(deliver[3].calls, ['implement']);
+
+    // "Report readiness … to `deliver-change`" is a return, not a call.
+    const handBack = skill('to-requirements').steps.at(-1);
+    assert.deepEqual(handBack.calls, []);
+    assert.deepEqual(handBack.names, ['deliver-change']);
+  });
+
+  it('separates a reference skill from one that is scheduled', () => {
+    const order = skill('to-tickets').steps[1];
+    assert.deepEqual(order.reads, ['codebase-design', 'domain-modeling']);
+    assert.deepEqual(skill('implement').steps[1].calls, ['tdd']);
+  });
+
+  it('orders skills the way the workflow reaches them', () => {
+    const named = map.skills.map((entry) => entry.name);
+    const at = (name) => named.indexOf(name);
+    assert.equal(named[0], 'deliver-change');
+    assert.ok(at('to-requirements') < at('to-spec'));
+    assert.ok(at('to-spec') < at('to-tickets'));
+    assert.ok(at('to-tickets') < at('implement'));
+    assert.ok(at('implement') < at('code-review'));
+  });
+
+  it('resolves a plan file against the configured plans directory', () => {
+    assert.equal(resolveArtifact('requirements.md', 'docs/changes'), 'docs/changes/<feature>/requirements.md');
+    assert.equal(resolveArtifact('<plans>/<feature-slug>/tickets/', '.docs/changes'), '.docs/changes/<feature>/tickets/');
+    assert.equal(resolveArtifact('collab-swarm.yml', '.docs/changes'), 'collab-swarm.yml');
+  });
+
+  it('puts a rule in force at the step that touches a file in its scope', () => {
+    const open = skill('deliver-change').steps[0];
+    assert.ok(open.artifacts.includes('.docs/changes/<feature>/plan.yml'));
+    const rule = open.rules.find((entry) => entry.file === 'feature-plans.md');
+    assert.equal(rule.reason, 'path');
+    assert.equal(rule.match, '.docs/changes/<feature>/plan.yml');
+    assert.equal(rule.pattern, '.docs/changes/**');
+
+    // A step that names no plan file does not drag the rule along.
+    assert.deepEqual(skill('implement').steps[1].rules, []);
+  });
+
+  it('puts a pack rule in force for every step of the skill it names', () => {
+    const endpoint = skill('http-endpoint');
+    assert.deepEqual(
+      endpoint.rules.map((rule) => [rule.file, rule.reason]),
+      [['http-endpoints.md', 'skill']],
+    );
+    assert.deepEqual(rulesAtStep(endpoint, endpoint.steps[0]).map((rule) => rule.file), ['http-endpoints.md']);
+  });
+
+  it('reports every site a rule governs', () => {
+    const plans = map.rules.find((rule) => rule.file === 'feature-plans.md');
+    assert.ok(plans.sites.length >= 5);
+    assert.ok(plans.sites.every((site) => site.reason === 'path'));
+    assert.ok(plans.sites.some((site) => site.skill === 'to-spec' && site.stepTitle === 'Hand back'));
+
+    const endpoints = map.rules.find((rule) => rule.file === 'http-endpoints.md');
+    assert.deepEqual(endpoints.sites, [
+      { skill: 'http-endpoint', step: null, stepTitle: null, reason: 'skill', match: null },
+    ]);
+  });
+
+  it('collects the swarm commands a step involves', () => {
+    assert.ok(skill('implement').steps[2].commands.includes('npx swarm check --focus <ticket test path>'));
+    assert.ok(skill('whats-next').steps[0].commands.includes('npx swarm next --lane "Dev 2"'));
+  });
+
+  it('reads a sequence numbered a heading level down', () => {
+    // `wizard` groups its steps under `## Process` and numbers them `### 1.`,
+    // and closes each on an emphasised `**Done when:**`.
+    const steps = skill('wizard').steps;
+    assert.equal(steps.length, 4);
+    assert.equal(steps[0].title, 'Scope the procedure');
+    assert.match(steps[0].doneWhen, /^every stage is named in order/);
+  });
+
+  it('reads a sequence written as a plain ordered list', () => {
+    const steps = skill('resolving-merge-conflicts').steps;
+    assert.equal(steps.length, 5);
+    assert.equal(steps[0].title, 'See the current state');
+    assert.equal(steps[2].title, 'Resolve each hunk');
+  });
+
+  it('leaves flat reference as topics rather than inventing steps from its lists', () => {
+    const design = skill('codebase-design');
+    assert.deepEqual(design.steps, []);
+    assert.ok(design.topics.includes('Deep vs shallow'));
+    assert.deepEqual(skill('tdd').steps, []);
+    assert.ok(skill('tdd').topics.includes('Rules of the loop'));
+  });
+
+  it('lists the files that sit beside a skill', () => {
+    assert.deepEqual(skill('to-requirements').companions, ['REQUIREMENTS-FORMAT.md']);
   });
 });

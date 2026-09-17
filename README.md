@@ -132,6 +132,7 @@ npx swarm init                    # install into this repository
 npx swarm sync [--check|--force]  # re-apply after an upgrade; --check fails CI when stale
 npx swarm add <pack>              # attach a language or framework skill pack
 npx swarm packs                   # what each installed pack contributes
+npx swarm steps [<skill>]         # what each skill does, step by step, and the rules in force
 
 npx swarm status [--lane <lane>]  # the board: done, in progress, available, blocked
 npx swarm next [--lane <lane>]    # the best unclaimed rows, ranked
@@ -143,7 +144,7 @@ npx swarm check [--focus <path>]  # your configured checks, in order
 npx swarm doctor                  # what is installed, stale, or missing
 ```
 
-`status`, `next`, `packs` and `validate` accept `--json`.
+`status`, `next`, `packs`, `steps` and `validate` accept `--json`.
 
 ## The backlog
 
@@ -196,6 +197,35 @@ collab-swarm-pack-go/
 ```
 
 `role` decides how a skill may be reached — `coordinator`, `stage`, `ticket`, or `reference`. Only **`ticket`** skills may appear in a ticket's `skills` list, and `validate` enforces it: a ticket naming a skill nobody installed fails, with the installed list in the error. See [docs/PACKS.md](docs/PACKS.md), and [`examples/pack-example`](examples/pack-example) for a working one.
+
+## Seeing what an agent will do
+
+The skills *are* the agent's instructions, so `steps` reads them back as an execution map: the sequence each one runs, what finishes each step, which skill it hands work to, and which rules are in force while it runs.
+
+```console
+$ npx swarm steps deliver-change
+
+Deliver Feature · deliver-change · coordinates a feature · core
+
+Steps
+  1. Open the plan
+       files collab-swarm.yml · .docs/changes/<feature>/plan.yml
+       rules feature-plans.md → .docs/changes/<feature>/plan.yml
+       runs  npx swarm validate
+       done  one package owns the feature and its current stage is known
+  2. Build the complete plan
+       calls to-requirements → to-spec → to-tickets
+       files .docs/changes/<feature>/requirements.md · .docs/changes/<feature>/specification.md
+       rules feature-plans.md → .docs/changes/<feature>/requirements.md
+       done  the user can judge the whole plan without opening a register
+  ...
+```
+
+`steps` with no argument walks every installed skill in the order the workflow reaches them, so the list top to bottom *is* the delegation. A step's `calls` are the skills it is told to use; a skill it merely reports back to shows as `names`, so the map is the real call graph rather than a keyword sweep.
+
+`steps --rules` inverts it — for each rule, every step it governs and the file that brought it into force. That is the shortest path to *why did it do that?*: a rule reaches a step either because the step writes a file inside the rule's globs, or because the rule names the skill as its recipe, and the map says which.
+
+Nothing is recorded to produce any of this. The map is read from the payload in your checkout, so it describes the skills you actually have, including everything your packs added — and the workflow keeps [no event log](assets/workflow/WORKFLOW.md), by design. It tells you what an agent is instructed to do, not what one did.
 
 ## Upgrading
 
