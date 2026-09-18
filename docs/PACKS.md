@@ -2,6 +2,11 @@
 
 The core workflow is deliberately ignorant of your stack. It knows how to turn a request into requirements, a specification, tickets, and a reviewed diff — but nothing about HTTP handlers, Riverpod providers, Django models, or Terraform state. A **pack** supplies that.
 
+Two kinds of pack, same format:
+
+- **A published pack** for a stack somebody has already packaged — installed with `npm install -D collab-swarm-pack-go && npx swarm add collab-swarm-pack-go`, and written to be true of every project using that stack. This document is how you write one.
+- **A stack pack for one project**, written from that project's own code: the call adapter everything routes through, the base class every handler extends, the wrapper used instead of raw exceptions. None of that generalises, so it is authored in the repository rather than installed. Ask an agent to run the `to-pack` skill, which researches the codebase and writes it into `.collab-swarm/packs/<name>/`. Everything below still applies — `to-pack` follows this format.
+
 ## What a pack contributes
 
 Three things, all optional except the first:
@@ -52,14 +57,20 @@ A skill directory with no manifest entry defaults to `role: ticket`.
 
 Role is the pack's most important decision: it decides how a skill can be reached, and the validator enforces it.
 
-| Role | Meaning | May a ticket name it? |
-| --- | --- | --- |
-| `coordinator` | Owns a feature end to end | No |
-| `stage` | Runs one stage of the workflow | No |
-| `ticket` | Implements one concern of a slice | **Yes** |
-| `reference` | Vocabulary consulted while deciding | No |
+| Role | Meaning | Reached by | May a ticket name it? |
+| --- | --- | --- | --- |
+| `coordinator` | Owns a feature end to end | the user | No |
+| `stage` | Runs one stage of the workflow | the workflow | No |
+| `router` | Selects the concern skills a slice needs | `implement`, per slice | No |
+| `ticket` | Implements one concern of a slice | a ticket's `skills` | **Yes** |
+| `review` | Reviews one surface a diff cannot judge | `deliver-change`, at review | No |
+| `reference` | Vocabulary consulted while deciding | being read | No |
 
 Most pack skills are `ticket`. Use `reference` for a skill that shapes a decision but never owns a slice of work — a design vocabulary, a concurrency model, a house style. A reference skill listed in a ticket's `skills` is a validation error, because scheduling it implies an owner it does not have.
+
+Ship a **router** once the pack has four or more concerns. Without one, an agent reads every concern skill on every slice; with one, it reads the router and then only what the slice needs. `swarm doctor` says so when a pack crosses that line.
+
+Ship a **review** skill for a surface whose correctness a diff cannot show — a rendered screen against its design, a query plan, an accessibility pass. `deliver-change` runs every review-role skill at feature review, for the surfaces that changed.
 
 Packs may not add `coordinator` or `stage` skills that replace the core ones; a later pack overriding a core skill name replaces its file, which is how you customise `code-review` for a house standard.
 

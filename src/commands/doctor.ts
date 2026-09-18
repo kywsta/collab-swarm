@@ -43,6 +43,22 @@ export async function run(_args: Args): Promise<number> {
     `${packs.packs.length} pack(s): ${packs.packs.map((pack) => pack.name).join(', ')} · ` +
       `${packs.skills.length} skills, ${packs.rules.length} rules`,
   );
+  if (packs.packs.every((pack) => pack.core)) {
+    say(
+      'warn',
+      'No skills for this project\'s stack',
+      'Every agent implements from its own priors. Ask yours to run the `to-pack` skill, or: npx swarm add <pack>',
+    );
+  } else if (!packs.skills.some((skill) => skill.role === 'router')) {
+    const concerns = packs.skills.filter((skill) => skill.role === 'ticket' && skill.pack !== 'core');
+    if (concerns.length >= 4) {
+      say(
+        'warn',
+        `${concerns.length} concern skills and no router`,
+        'An agent reads every one of them per slice. A router selects the smallest applicable set.',
+      );
+    }
+  }
 
   const plan = planSync(root, config, VERSION);
   const pending = plan.files.filter((file) => file.action === 'create' || file.action === 'update');

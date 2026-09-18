@@ -72,6 +72,7 @@ ${style.bold('Set up')}
   sync [--check] [--force] Re-apply skills, rules and instructions after an upgrade
   add <pack...>            Attach a language or framework skill pack
   packs                    List installed packs and what each contributes
+  pack new <name>          Scaffold a skill pack for this project's own stack
   steps [<skill>]          Show what each skill does, step by step, and the rules in force
   doctor                   Check the installation and report what is missing
 
@@ -113,6 +114,8 @@ async function dispatch(args: Args): Promise<number> {
       return (await import('./commands/add.js')).run(args);
     case 'packs':
       return (await import('./commands/packs.js')).run(args);
+    case 'pack':
+      return (await import('./commands/pack.js')).run(args);
     case 'steps':
       return (await import('./commands/steps.js')).run(args);
     case 'doctor':

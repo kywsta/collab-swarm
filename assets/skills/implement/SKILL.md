@@ -15,7 +15,9 @@ Done when the ticket has one concrete outcome and no unresolved prerequisite.
 
 ## 2. Build in red-green slices
 
-Use `tdd` for each changed behaviour. Before editing a concern, read the skill that owns it: the ticket's `skills` list is the plan, and `npx swarm packs` names the rest if the diff reaches a concern the ticket did not anticipate. Run the smallest relevant test after each slice. Change annotated sources before regenerating their outputs.
+Use `tdd` for each changed behaviour. Before editing a concern, read the skill that owns it: the ticket's `skills` list is the plan, and `npx swarm packs` names the rest if the diff reaches a concern the ticket did not anticipate.
+
+When an installed pack provides a router — a skill whose role is *routes a ticket to its concerns* — use it once per slice to select the smallest applicable set, rather than reading every concern skill the pack ships. Accumulate the completion checks the selected skills name; this skill owns running them. Run the smallest relevant test after each slice. Change annotated sources before regenerating their outputs.
 
 Documentation, generated output, mechanical configuration, and visual-only token changes may skip a new failing test when the ticket records why and another check demonstrates correctness.
 

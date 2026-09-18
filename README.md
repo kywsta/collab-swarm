@@ -131,6 +131,7 @@ packs: []
 npx swarm init                    # install into this repository
 npx swarm sync [--check|--force]  # re-apply after an upgrade; --check fails CI when stale
 npx swarm add <pack>              # attach a language or framework skill pack
+npx swarm pack new <name>         # scaffold a pack for this project's own stack
 npx swarm packs                   # what each installed pack contributes
 npx swarm steps [<skill>]         # what each skill does, step by step, and the rules in force
 
@@ -196,7 +197,55 @@ collab-swarm-pack-go/
 }
 ```
 
-`role` decides how a skill may be reached — `coordinator`, `stage`, `ticket`, or `reference`. Only **`ticket`** skills may appear in a ticket's `skills` list, and `validate` enforces it: a ticket naming a skill nobody installed fails, with the installed list in the error. See [docs/PACKS.md](docs/PACKS.md), and [`examples/pack-example`](examples/pack-example) for a working one.
+`role` decides how a skill may be reached. Only **`ticket`** skills may appear in a ticket's `skills` list, and `validate` enforces it: a ticket naming a skill nobody installed fails, with the installed list in the error.
+
+| Role | Reached by |
+| --- | --- |
+| `coordinator` | the user, for a whole feature |
+| `stage` | one stage of the workflow |
+| `router` | `implement`, once per red-green slice |
+| `ticket` | **a ticket's `skills` list** |
+| `review` | `deliver-change`, at feature review |
+| `reference` | being read, when a decision needs its vocabulary |
+
+See [docs/PACKS.md](docs/PACKS.md), and [`examples/pack-example`](examples/pack-example) for a working one.
+
+## Skills for your own stack
+
+A published pack only exists for stacks somebody has already packaged. Your project's conventions — the call adapter everything routes through, the base class every handler extends, the wrapper you use instead of raw exceptions — exist in your code and nowhere else.
+
+Ask your agent for them:
+
+```text
+"Write the skills for this project's stack."
+```
+
+The `to-pack` skill reads your dependency manifest, your build and lint config, and two or three features already built end to end, proposes the concerns it found, and then writes a pack into `.collab-swarm/packs/<name>/`:
+
+```text
+flutter-dev                routes a ticket to its concerns
+flutter-api-integration    implements a ticket
+flutter-state-management   implements a ticket
+flutter-ui-implement       implements a ticket
+flutter-ui-review          reviews one surface
+rules/api-integration.md   lib/**/data/**, lib/**/domain/**
+```
+
+The rule that separates a useful stack skill from a wasted one is that **it names your code**. `guardedParse`, `privateApiClientProvider`, `@RestApi(parser: Parser.FlutterCompute)` — not "use your HTTP client". A skill that restates the framework's documentation costs tokens on every turn and teaches nothing.
+
+The **router** is what keeps a large pack cheap. `implement` hands it each red-green slice, and it selects the smallest applicable set, so a ticket that only touches error handling never loads the navigation skill:
+
+```text
+tdd
+ └─ flutter-dev  ── selects ──▶  flutter-api-integration
+                                 flutter-error-handling
+code-review
+ └─ flutter-ui-review  (only because the diff touched a screen)
+```
+
+Tickets name concern skills; nothing names the router or a review skill, because `implement` and `deliver-change` reach those themselves.
+
+Verify what you got with the commands that read it back — `npx swarm packs`, `npx swarm steps <router>`, `npx swarm steps --rules`, `npx swarm validate`. A skill with no description, a rule scoped to nothing, and a step with no completion criterion are each reported.
 
 ## Seeing what an agent will do
 

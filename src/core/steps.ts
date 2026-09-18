@@ -254,7 +254,10 @@ function doneWhen(body: string): string | null {
 
 const INLINE_CODE = /`([^`\n]+)`/g;
 const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
-const COMMAND = /npx swarm(?:[ \t]+(?:--?[a-z][a-z-]*|<[^>\n]+>|"[^"\n]*"|[A-Za-z][\w./-]*))*/g;
+// A leading `.` is allowed only when a word character follows it, so a path
+// argument is captured whole while a sentence's closing period is not.
+const COMMAND =
+  /npx swarm(?:[ \t]+(?:--?[a-z][a-z-]*|<[^>\n]+>|"[^"\n]*"|\.[\w./<>-]+|[A-Za-z][\w./-]*))*/g;
 const EXTENSION = /\.(?:md|ya?ml|json|txt|sh)$/;
 
 /**
@@ -310,6 +313,8 @@ const forMatching = (path: string) => (path.endsWith('/') ? `${path}*` : path);
 
 interface SkillContext {
   name: string;
+  /** This skill's own role, which changes how it names another skill. */
+  role: SkillRole;
   plansDir: string;
   /** Every installed skill's role, for telling a delegation from a citation. */
   roles: Map<string, SkillRole>;
@@ -332,7 +337,11 @@ function namedSkills(body: string, context: SkillContext) {
       reads.push(token);
       continue;
     }
-    (DELEGATES.test(body.slice(0, match.index)) ? calls : names).push(token);
+    // A router names concern skills in a table, where the verb that would mark
+    // a delegation lives in a column header rows away. Routing to a concern is
+    // a delegation by definition, so the table needs no verb to prove it.
+    const routed = context.role === 'router' && role === 'ticket';
+    (routed || DELEGATES.test(body.slice(0, match.index)) ? calls : names).push(token);
   }
 
   const called = new Set(calls);
@@ -446,6 +455,7 @@ export function readSkillMap(
   const rules = skillRules(skill.name, packs.rules, pointedAt);
   const context: SkillContext = {
     name: skill.name,
+    role: skill.role,
     plansDir: options.plansDir,
     roles: new Map(packs.skills.map((entry) => [entry.name, entry.role])),
     rules: packs.rules,
@@ -485,7 +495,7 @@ function inWorkflowOrder(maps: SkillMap[]): SkillMap[] {
     for (const step of map.steps) for (const next of step.calls) take(byName.get(next));
   };
 
-  const roles: SkillRole[] = ['coordinator', 'stage', 'ticket', 'reference'];
+  const roles: SkillRole[] = ['coordinator', 'stage', 'router', 'ticket', 'review', 'reference'];
   for (const role of roles) for (const map of maps.filter((map) => map.role === role)) take(map);
   return ordered;
 }

@@ -368,6 +368,27 @@ export function validateRepository(
     if (config.backlog && !exists(inRoot(root, config.backlog))) {
       findings.warn(config.backlog, 'the configured backlog file does not exist, so the board has no register to read');
     }
+
+    // An unscoped rule is loaded into every agent turn, which is almost never
+    // what a pack meant: a rule earns its place by being narrow.
+    for (const rule of packs.rules) {
+      if (rule.paths.length === 0) {
+        findings.warn(
+          rule.path,
+          `rule "${rule.file}" declares no paths, so it applies to every file in the repository; scope it with \`paths:\``,
+        );
+      }
+    }
+
+    // A skill an agent never opens because its description is blank.
+    for (const skill of packs.skills) {
+      if (skill.description === '') {
+        findings.warn(
+          join(skill.dir, 'SKILL.md'),
+          `skill "${skill.name}" has no description, which is the line an agent reads to decide whether to open it`,
+        );
+      }
+    }
   }
 
   const plansRoot = inRoot(root, config.plans);

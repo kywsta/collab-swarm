@@ -272,7 +272,13 @@ function applyAndReport(root: string, config: Config, _args: Args, fresh = false
     out('');
   }
   out(`  Ask your agent: ${style.bold('"What\'s next?"')} or ${style.bold('"Make a plan to implement <feature>"')}`);
-  out(style.dim(`  Add a framework pack later: npx swarm add <pack>`));
+  if (plan.packs.packs.every((pack) => pack.core)) {
+    out(
+      `  Give it skills for this stack: ${style.bold('"Write the skills for this project\'s stack"')} ` +
+        style.dim('(the `to-pack` skill researches the codebase and writes them)'),
+    );
+  }
+  out(style.dim('  Or attach a published one: npx swarm add <pack>'));
   return 0;
 }
 

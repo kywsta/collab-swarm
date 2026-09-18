@@ -44,10 +44,10 @@ When the user asked only for a plan, stop after presenting it. "Implement", "pro
 Implementation follows the ticket order and dependency names:
 
 1. Mark the next unblocked ticket `in-progress`.
-2. Use `implement`, which applies TDD and the concern skills the ticket names.
+2. Use `implement`, which applies TDD and the concern skills the ticket names, through the pack's router when it has one.
 3. Run the [project checks](#project-checks) with a ticket-focused test path.
 4. Mark the ticket `done` only after its behaviour and checks pass.
-5. After all tickets are done or deferred, review the full feature diff with `code-review`, and with any review skill an installed pack adds for the surfaces that changed.
+5. After all tickets are done or deferred, review the full feature diff with `code-review`, and with every review-role skill an installed pack adds, for the surfaces that changed.
 6. Repair blocking findings and run the full [project checks](#project-checks).
 7. Mark the plan complete and report the delivered behaviour, review result, and commands run.
 
@@ -91,7 +91,7 @@ Tickets link to named requirements and specification sections where useful. Each
 
 Dependencies use ticket slugs. The graph must be acyclic, and a ticket starts only when its dependencies are done. Prefer a short sequential list over an elaborate graph unless the feature is genuinely parallel.
 
-`skills` may name only skills whose role is *implements a ticket*. `npx swarm packs` lists them, and the validator rejects any other name — coordination and reference skills are reached by reading them, not by scheduling them.
+`skills` may name only skills whose role is *implements a ticket*. `npx swarm packs` lists them, and the validator rejects any other name — a coordinator, a router, a review skill and a reference skill are each reached another way, not by scheduling them.
 
 A ticket that waits on an external gate the feature can ship without (an API another team owes, a third-party account) is `deferred`, with a `## Deferred` section naming what it waits for and who owns it. Deferred tickets do not block review or completion and are reopened as `planned` when the gate closes. `blocked` is for a ticket that stops the feature until the user decides; it records the decision it needs under `## Blocked`.
 
@@ -100,6 +100,16 @@ A ticket that waits on an external gate the feature can ship without (an API ano
 Changed behaviour starts with a failing test at a public boundary named in the specification's test plan. Use `tdd` for the loop, and the smallest set of concern skills each slice needs.
 
 Which concern skills exist depends on the installed packs. Read the ticket's `skills` list, and consult `npx swarm packs` when a slice touches a concern the ticket did not anticipate. Generated files remain machine-owned: change the annotated source, then regenerate.
+
+A pack with several concerns ships a **router**: one skill that reads the ticket and selects the smallest applicable set for each slice, so a ticket touching only error handling never loads the navigation skill. Where a router exists, `implement` uses it once per slice instead of reading every concern skill the pack ships. A router is never named in a ticket; nor is a review skill. Only ticket-role skills are.
+
+## Stack skills
+
+The workflow above knows nothing about the stack. What the project is written in, the conventions it has settled on, and the way its libraries are actually used live in a **stack pack**: a router, one skill per concern, path-scoped rules, and the checks they need.
+
+A pack is installed (`npx swarm add collab-swarm-pack-go`) or written for this project from its own code (`to-pack`, which researches the repository and authors one). Either way the skills are vendored into every agent's directory by `sync`, so the same concern is implemented the same way by every developer and every agent.
+
+A project with no pack is not broken — `implement` falls back to TDD and the code already present — but nothing owns any concern, so each agent decides afresh how this project builds an endpoint or a screen. Write the pack once the second feature repeats the first one's decisions.
 
 ## Project checks
 
@@ -121,7 +131,7 @@ Review the whole feature against two questions:
 1. Does the diff follow repository and architecture standards?
 2. Does it deliver the requirements and specification?
 
-Run any additional review an installed pack provides for the surfaces that changed.
+Run every review-role skill an installed pack provides, for the surfaces that changed.
 
 Blocking findings are correctness, security, privacy, data-loss, architecture, accessibility, requirement, or failing-check problems. Fix them before completion. Advisory findings may be reported as follow-up work.
 

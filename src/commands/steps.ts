@@ -69,10 +69,13 @@ function renderOverview(map: ReturnType<typeof buildStepMap>, project: string, p
 
   if (consulted.length > 0) {
     out('');
-    out(style.bold('Read, not run'));
-    out(style.dim('  No numbered sequence: read for vocabulary and judgement while another skill runs.'));
+    out(style.bold('No numbered sequence'));
+    out(style.dim('  These are read, not walked. A skill that runs should close each step on a criterion.'));
     for (const skill of consulted) {
-      out(`  ${style.bold(skill.name)} ${style.dim(skill.topics.join(' · ') || skill.description)}`);
+      out(
+        `  ${style.bold(skill.name)} ${style.dim(ROLE_LABEL[skill.role])}` +
+          `${skill.topics.length ? style.dim(` · ${skill.topics.join(' · ')}`) : ''}`,
+      );
     }
   }
 

@@ -23,17 +23,33 @@ export const MANIFEST_FILE = 'collab-swarm-pack.json';
  *
  * - `coordinator` owns a feature end to end;
  * - `stage` runs one stage of the workflow;
+ * - `router` reads a ticket and selects the concern skills its slice needs;
  * - `ticket` implements a concern and may be listed in a ticket's `skills`;
+ * - `review` reviews one surface a pack owns, during feature review;
  * - `reference` is consulted for vocabulary and never scheduled.
+ *
+ * Only `ticket` may appear in a ticket's `skills`. A router is reached by
+ * `implement`, a review skill by `deliver-change`, and a reference skill by
+ * being read — so a plan that schedules one of them is a mistake the
+ * validator catches.
  */
-export type SkillRole = 'coordinator' | 'stage' | 'ticket' | 'reference';
-export const SKILL_ROLES: SkillRole[] = ['coordinator', 'stage', 'ticket', 'reference'];
+export type SkillRole = 'coordinator' | 'stage' | 'router' | 'ticket' | 'review' | 'reference';
+export const SKILL_ROLES: SkillRole[] = [
+  'coordinator',
+  'stage',
+  'router',
+  'ticket',
+  'review',
+  'reference',
+];
 
 /** How a role is named to a human, in `packs` and `steps`. */
 export const ROLE_LABEL: Record<SkillRole, string> = {
   coordinator: 'coordinates a feature',
   stage: 'runs one stage',
+  router: 'routes a ticket to its concerns',
   ticket: 'implements a ticket',
+  review: 'reviews one surface',
   reference: 'consulted, never scheduled',
 };
 

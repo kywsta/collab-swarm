@@ -6,6 +6,7 @@
  * around a block collab-swarm can keep current.
  */
 
+import { ROLE_LABEL, SKILL_ROLES } from '../packs.js';
 import type { EmitContext } from './types.js';
 
 export const BLOCK_START = '<!-- collab-swarm:start -->';
@@ -129,21 +130,13 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
   if (skills.length > 0) {
     lines.push('## Skills');
     lines.push('');
-    const byRole = {
-      coordinator: skills.filter((skill) => skill.role === 'coordinator'),
-      stage: skills.filter((skill) => skill.role === 'stage'),
-      ticket: skills.filter((skill) => skill.role === 'ticket'),
-      reference: skills.filter((skill) => skill.role === 'reference'),
-    };
-    const describe = (label: string, list: typeof skills) =>
-      list.length ? `- **${label}:** ${list.map((skill) => `\`${skill.name}\``).join(', ')}` : null;
-    for (const line of [
-      describe('Coordinates a feature', byRole.coordinator),
-      describe('Runs one stage', byRole.stage),
-      describe('Implements a ticket', byRole.ticket),
-      describe('Consulted, never scheduled', byRole.reference),
-    ]) {
-      if (line) lines.push(line);
+    // Driven by the role list rather than a fixed set of groups, so a pack
+    // that adds a router or a review skill still appears here.
+    for (const role of SKILL_ROLES) {
+      const named = skills.filter((skill) => skill.role === role);
+      if (named.length === 0) continue;
+      const label = ROLE_LABEL[role].replace(/^./, (first) => first.toUpperCase());
+      lines.push(`- **${label}:** ${named.map((skill) => `\`${skill.name}\``).join(', ')}`);
     }
     lines.push('');
     lines.push(

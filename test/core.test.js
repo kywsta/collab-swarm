@@ -8,12 +8,12 @@ import { Board } from '../dist/core/board.js';
 import { canTransition, newPlan, readPlan, readTickets, readyTickets, sectionBody, serializePlan } from '../dist/core/plan.js';
 import { Register } from '../dist/core/register.js';
 import { renderNext, renderStatus } from '../dist/core/render.js';
-import { Findings, validatePlan } from '../dist/core/validate.js';
+import { Findings, validatePlan, validateRepository } from '../dist/core/validate.js';
 import { corePack, loadPacks, ticketSkills } from '../dist/packs.js';
 import { buildStepMap, resolveArtifact, rulesAtStep } from '../dist/core/steps.js';
 import { firstMatch, matchesGlob } from '../dist/util/glob.js';
 import { parseConfig, serializeConfig } from '../dist/config.js';
-import { mergeBlock, BLOCK_END, BLOCK_START } from '../dist/targets/memory.js';
+import { mergeBlock, renderMemoryBlock, BLOCK_END, BLOCK_START } from '../dist/targets/memory.js';
 import { writeText } from '../dist/util/fs.js';
 import { parseArgs } from '../dist/cli.js';
 
@@ -597,5 +597,129 @@ describe('step map', () => {
 
   it('lists the files that sit beside a skill', () => {
     assert.deepEqual(skill('to-requirements').companions, ['REQUIREMENTS-FORMAT.md']);
+  });
+});
+
+describe('stack packs', () => {
+  const packRoot = (dir, skills, rules = {}) => {
+    writeText(
+      join(dir, 'collab-swarm-pack.json'),
+      JSON.stringify({
+        name: 'flutter',
+        title: 'Flutter',
+        collabSwarm: 1,
+        skills: skills.map(({ name, role }) => ({ name, role })),
+      }),
+    );
+    for (const skill of skills) {
+      writeText(join(dir, 'skills', skill.name, 'SKILL.md'), skill.body);
+    }
+    for (const [file, body] of Object.entries(rules)) {
+      writeText(join(dir, 'rules', file), body);
+    }
+    return dir;
+  };
+
+  const ROUTER = `---
+name: flutter-dev
+description: Route an approved Flutter ticket to the skills its work requires.
+---
+
+# Flutter Development Router
+
+## 1. Select the concern set
+
+| Ticket concern | Use |
+| --- | --- |
+| Endpoint, DTO, mapper | \`flutter-api-integration\` |
+| ViewModel, page state | \`flutter-state-management\` |
+
+Consult \`codebase-design\` when the seam shape is a design problem. Return to \`deliver-change\` when a decision changes.
+
+Done when every concern maps to one skill.
+`;
+
+  const CONCERN = (name) => `---
+name: ${name}
+description: A concern of this project's Flutter stack, with its own invariants.
+---
+
+# ${name}
+
+## 1. Build it
+
+Done when it is built.
+`;
+
+  const dir = packRoot(join(tempRepo(), 'pack'), [
+    { name: 'flutter-dev', role: 'router', body: ROUTER },
+    { name: 'flutter-api-integration', role: 'ticket', body: CONCERN('flutter-api-integration') },
+    { name: 'flutter-state-management', role: 'ticket', body: CONCERN('flutter-state-management') },
+    { name: 'flutter-ui-review', role: 'review', body: CONCERN('flutter-ui-review') },
+  ], {
+    'api-integration.md': `---
+paths: ["lib/**/data/**"]
+description: Invariants for the Retrofit stack.
+---
+
+Recipe: [\`flutter-api-integration\`](../skills/flutter-api-integration/SKILL.md).
+`,
+  });
+
+  const packs = loadPacks(process.cwd(), [dir]);
+
+  it('keeps a router and a review skill out of a ticket\'s reach', () => {
+    const allowed = ticketSkills(packs);
+    assert.ok(allowed.includes('flutter-api-integration'));
+    assert.ok(!allowed.includes('flutter-dev'), 'a ticket must not schedule the router');
+    assert.ok(!allowed.includes('flutter-ui-review'), 'a ticket must not schedule a review skill');
+  });
+
+  it('reads the whole routing table as delegation, not just the row with a verb', () => {
+    const map = buildStepMap(packs, { plansDir: '.docs/changes' });
+    const router = map.skills.find((skill) => skill.name === 'flutter-dev');
+    assert.equal(router.role, 'router');
+    assert.deepEqual(router.steps[0].calls, ['flutter-api-integration', 'flutter-state-management']);
+    // A return upward stays a mention even inside a router.
+    assert.deepEqual(router.steps[0].names, ['deliver-change']);
+    assert.deepEqual(router.steps[0].reads, ['codebase-design']);
+  });
+
+  it('orders the router before the concerns it selects', () => {
+    const named = buildStepMap(packs, { plansDir: '.docs/changes' }).skills.map((s) => s.name);
+    assert.ok(named.indexOf('flutter-dev') < named.indexOf('flutter-api-integration'));
+  });
+
+  it('puts a pack rule in force for the skill its recipe link names', () => {
+    const map = buildStepMap(packs, { plansDir: '.docs/changes' });
+    const api = map.skills.find((skill) => skill.name === 'flutter-api-integration');
+    assert.deepEqual(
+      api.rules.map((rule) => [rule.file, rule.reason]),
+      [['api-integration.md', 'skill']],
+    );
+  });
+
+  it('lists every role in the always-loaded instruction block', () => {
+    const block = renderMemoryBlock(
+      { config: parseConfig('project: Demo'), packs, root: '.', workflow: new Map(), skills: packs.skills, rules: packs.rules, version: '0' },
+      '.claude/workflow',
+    );
+    assert.match(block, /Routes a ticket to its concerns:.*flutter-dev/);
+    assert.match(block, /Reviews one surface:.*flutter-ui-review/);
+    assert.match(block, /Implements a ticket:.*flutter-api-integration/);
+  });
+
+  it('reports a rule that would apply everywhere and a skill nobody would open', () => {
+    const loose = packRoot(join(tempRepo(), 'loose'), [
+      { name: 'unwritten', role: 'ticket', body: '---\nname: unwritten\ndescription:\n---\n\n# unwritten\n' },
+    ], { 'house-style.md': '---\npaths: []\n---\n\n# House style\n' });
+    const findings = validateRepository(
+      process.cwd(),
+      { ...parseConfig('project: Demo'), plans: join(tempRepo(), 'no-plans') },
+      loadPacks(process.cwd(), [loose]),
+    );
+    const messages = findings.warnings.map((finding) => finding.message);
+    assert.ok(messages.some((message) => message.includes('declares no paths')));
+    assert.ok(messages.some((message) => message.includes('has no description')));
   });
 });

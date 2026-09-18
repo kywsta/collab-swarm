@@ -48,7 +48,7 @@ Done when every ticket is done or deferred, or a concrete user decision blocks t
 
 ## 5. Review and finish
 
-Set `stage: review`. Run `code-review` over the full diff from `implementation_base_sha`. Run any additional review skill an installed pack provides for the surfaces that changed — `npx swarm packs` lists them. Fix every blocking finding and repeat affected checks and reviews.
+Set `stage: review`. Run `code-review` over the full diff from `implementation_base_sha`. Then run every skill an installed pack provides whose role is *reviews one surface*, for the surfaces the diff touched — `npx swarm packs` lists them with their roles. Fix every blocking finding and repeat affected checks and reviews.
 
 Run the full [project checks](../../workflow/WORKFLOW.md#project-checks) with `npx swarm check`. Synchronise affected domain, architecture, routing, and design documentation when the delivered change altered those contracts.
 

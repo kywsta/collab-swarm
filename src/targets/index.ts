@@ -179,13 +179,14 @@ export const cursor: Target = {
 };
 
 /**
- * A slash command per coordinator and stage skill, for the tools that expose
- * saved prompts. Each one hands straight to the skill so there is a single
- * source of behaviour.
+ * A slash command per skill a user may start themselves, for the tools that
+ * expose saved prompts. Each one hands straight to the skill so there is a
+ * single source of behaviour. Routers and ticket skills are left out: they are
+ * reached from inside the workflow, by `implement` and by a ticket's `skills`.
  */
 function commandFiles(context: EmitContext, dir: string, extension: string): Emission[] {
   return context.skills
-    .filter((skill) => skill.role === 'coordinator' || skill.role === 'stage')
+    .filter((skill) => ['coordinator', 'stage', 'review'].includes(skill.role))
     .map((skill) =>
       managed(
         `${dir}/${skill.name}.${extension}`,
