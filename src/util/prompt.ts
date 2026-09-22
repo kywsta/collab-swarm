@@ -34,6 +34,36 @@ export async function input(question: string, fallback: string): Promise<string>
 }
 
 /**
+ * Numbered single-select, with the same line-based reasoning as `multiSelect`.
+ *
+ * `fallback` is returned unchanged when there is no terminal to ask, so a
+ * scripted `init` or a CI `sync` takes the pack's declared default rather than
+ * hanging on a question nobody can answer.
+ */
+export async function select(title: string, choices: Choice[], fallback: string): Promise<string> {
+  if (choices.length === 0) return fallback;
+  if (!interactive()) return fallback;
+
+  const fallbackIndex = Math.max(
+    0,
+    choices.findIndex((choice) => choice.value === fallback),
+  );
+  process.stdout.write(`\n${style.bold(title)}\n`);
+  choices.forEach((choice, index) => {
+    const mark = index === fallbackIndex ? style.green('•') : style.dim('◦');
+    const hint = choice.hint ? ` ${style.dim(choice.hint)}` : '';
+    process.stdout.write(`  ${mark} ${style.bold(String(index + 1))}. ${choice.label}${hint}\n`);
+  });
+
+  const answer = await ask(
+    `${style.dim('A number, or Enter for')} ${fallbackIndex + 1}. ${choices[fallbackIndex]!.label}: `,
+  );
+  if (answer === '') return choices[fallbackIndex]!.value;
+  const picked = Number.parseInt(answer, 10);
+  return picked >= 1 && picked <= choices.length ? choices[picked - 1]!.value : choices[fallbackIndex]!.value;
+}
+
+/**
  * Numbered multi-select. Deliberately line-based rather than raw-mode cursor
  * UI: it works in every terminal, over SSH, and inside an agent session that
  * pipes stdin, and it degrades to the preselected defaults when not a TTY.

@@ -9,7 +9,7 @@
 
 import { dirname, join } from 'node:path';
 import type { Config } from './config.js';
-import { loadPacks, type PackSet } from './packs.js';
+import { loadPacks, readPackFile, type PackSet } from './packs.js';
 import {
   digest,
   exists,
@@ -71,12 +71,17 @@ function workflowDocuments(packs: PackSet): Map<string, string> {
   return documents;
 }
 
-/** Every file of every skill, as emissions under one skill root. */
+/**
+ * Every file of every skill, as emissions under one skill root.
+ *
+ * Bodies are read through the pack's answers, so a project that chose one push
+ * provider never has the other one's prose published into its agent files.
+ */
 function skillPayload(packs: PackSet, skillRoot: string): Emission[] {
   const emissions: Emission[] = [];
   for (const skill of packs.skills) {
     for (const file of listFiles(skill.dir)) {
-      const content = readTextOrNull(join(skill.dir, file));
+      const content = readPackFile(skill, join(skill.dir, file));
       if (content === null) continue;
       emissions.push({ path: `${skillRoot}/${skill.name}/${file}`, content, mode: 'managed' });
     }
@@ -85,7 +90,7 @@ function skillPayload(packs: PackSet, skillRoot: string): Emission[] {
 }
 
 export function buildContext(root: string, config: Config, version: string): EmitContext {
-  const packs = loadPacks(root, config.packs);
+  const packs = loadPacks(root, config.packs, config.packOptions);
   return {
     config,
     packs,

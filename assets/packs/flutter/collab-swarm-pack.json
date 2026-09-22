@@ -1,0 +1,354 @@
+{
+  "name": "flutter",
+  "title": "Flutter",
+  "description": "Flutter app concerns: Clean Architecture per feature, Riverpod state, go_router navigation, a Dio/Retrofit data stack, failures as values, and the integrations this project chose.",
+  "collabSwarm": 1,
+  "detect": ["pubspec.yaml"],
+  "options": [
+    {
+      "id": "notifications",
+      "question": "Push notifications",
+      "detail": "Decides the delivery adapter the push skill is written against. The ports around it are the same either way.",
+      "default": "firebase",
+      "choices": [
+        {
+          "id": "firebase",
+          "label": "Firebase Cloud Messaging",
+          "hint": "firebase_messaging + flutter_local_notifications",
+          "vars": {
+            "source": "FcmNotificationSource",
+            "sdk": "FirebaseMessaging",
+            "package": "firebase_messaging"
+          },
+          "packages": [
+            { "name": "firebase_core", "version": "^4.0.0", "use": "Firebase app initialisation, before the provider container" },
+            { "name": "firebase_messaging", "version": "^16.0.0", "use": "Push transport: tokens, topics, foreground and background messages" },
+            { "name": "flutter_local_notifications", "version": "^21.0.0", "use": "Displaying a foreground message as a system notification" }
+          ]
+        },
+        {
+          "id": "onesignal",
+          "label": "OneSignal",
+          "hint": "onesignal_flutter, FCM and APNs behind one dashboard",
+          "vars": {
+            "source": "OneSignalNotificationSource",
+            "sdk": "OneSignal",
+            "package": "onesignal_flutter"
+          },
+          "packages": [
+            { "name": "onesignal_flutter", "version": "^5.0.0", "use": "Push delivery, display and tap handling through the OneSignal SDK" }
+          ]
+        },
+        {
+          "id": "none",
+          "label": "No push notifications",
+          "hint": "the push skill and its rule are not installed",
+          "vars": {},
+          "packages": []
+        }
+      ]
+    },
+    {
+      "id": "analytics",
+      "question": "Product analytics",
+      "detail": "Decides the sink behind the analytics port. Event names and the screen-view hook stay the same.",
+      "default": "firebase",
+      "choices": [
+        {
+          "id": "firebase",
+          "label": "Firebase Analytics (GA4)",
+          "hint": "firebase_analytics, no extra credential",
+          "vars": { "sink": "FirebaseAnalyticsSink", "sdk": "FirebaseAnalytics", "package": "firebase_analytics" },
+          "packages": [
+            { "name": "firebase_core", "version": "^4.0.0", "use": "Firebase app initialisation, before the provider container" },
+            { "name": "firebase_analytics", "version": "^12.0.0", "use": "Product and acquisition analytics behind the AnalyticsSink port" }
+          ]
+        },
+        {
+          "id": "mixpanel",
+          "label": "Mixpanel",
+          "hint": "mixpanel_flutter, product analytics only",
+          "vars": { "sink": "MixpanelAnalyticsSink", "sdk": "Mixpanel", "package": "mixpanel_flutter" },
+          "packages": [
+            { "name": "mixpanel_flutter", "version": "^2.0.0", "use": "Product analytics behind the AnalyticsSink port" }
+          ]
+        },
+        {
+          "id": "posthog",
+          "label": "PostHog",
+          "hint": "posthog_flutter, product analytics and session insight",
+          "vars": { "sink": "PostHogAnalyticsSink", "sdk": "Posthog", "package": "posthog_flutter" },
+          "packages": [
+            { "name": "posthog_flutter", "version": "^5.0.0", "use": "Product analytics behind the AnalyticsSink port" }
+          ]
+        },
+        {
+          "id": "none",
+          "label": "No analytics",
+          "hint": "the port stays, bound to the no-op sink",
+          "vars": {},
+          "packages": []
+        }
+      ]
+    },
+    {
+      "id": "crash",
+      "question": "Crash and error reporting",
+      "detail": "Where a TechnicalFailure goes after it is captured at the seam.",
+      "default": "crashlytics",
+      "choices": [
+        {
+          "id": "crashlytics",
+          "label": "Firebase Crashlytics",
+          "hint": "firebase_crashlytics",
+          "vars": { "reporter": "CrashlyticsReporter", "sdk": "FirebaseCrashlytics", "package": "firebase_crashlytics" },
+          "packages": [
+            { "name": "firebase_core", "version": "^4.0.0", "use": "Firebase app initialisation, before the provider container" },
+            { "name": "firebase_crashlytics", "version": "^5.0.0", "use": "Crash and non-fatal reporting behind the CrashReporter port" }
+          ]
+        },
+        {
+          "id": "sentry",
+          "label": "Sentry",
+          "hint": "sentry_flutter",
+          "vars": { "reporter": "SentryReporter", "sdk": "Sentry", "package": "sentry_flutter" },
+          "packages": [
+            { "name": "sentry_flutter", "version": "^9.0.0", "use": "Crash and non-fatal reporting behind the CrashReporter port" }
+          ]
+        },
+        {
+          "id": "none",
+          "label": "No crash reporting",
+          "hint": "capture still classifies and logs, but reports nowhere",
+          "vars": {},
+          "packages": []
+        }
+      ]
+    },
+    {
+      "id": "logging",
+      "question": "Logging",
+      "detail": "The structured logger behind the AppLogger port.",
+      "default": "logger",
+      "choices": [
+        {
+          "id": "logger",
+          "label": "logger",
+          "hint": "levelled console output, printers per flavor",
+          "vars": { "impl": "LoggerAppLogger", "sdk": "Logger", "package": "logger" },
+          "packages": [
+            { "name": "logger", "version": "^2.0.0", "use": "Levelled structured logging behind the AppLogger port" }
+          ]
+        },
+        {
+          "id": "talker",
+          "label": "talker",
+          "hint": "logging plus an in-app inspector and a Dio interceptor",
+          "vars": { "impl": "TalkerAppLogger", "sdk": "Talker", "package": "talker_flutter" },
+          "packages": [
+            { "name": "talker_flutter", "version": "^5.0.0", "use": "Structured logging and the in-app log inspector" },
+            { "name": "talker_dio_logger", "version": "^5.0.0", "use": "Dio interceptor that logs requests and responses" }
+          ]
+        },
+        {
+          "id": "none",
+          "label": "No logging package",
+          "hint": "the port stays, backed by dart:developer log",
+          "vars": { "impl": "DeveloperLogAppLogger", "sdk": "developer.log", "package": "dart:developer" },
+          "packages": []
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "question": "Structured local database",
+      "detail": "Secure storage and preferences are in the pack either way; this is the store for rows and objects.",
+      "default": "none",
+      "choices": [
+        {
+          "id": "none",
+          "label": "None beyond secure storage and preferences",
+          "hint": "add one when a ticket needs it",
+          "vars": {},
+          "packages": []
+        },
+        {
+          "id": "drift",
+          "label": "Drift",
+          "hint": "typed SQL, migrations, reactive queries",
+          "vars": { "store": "database", "model": "table", "sdk": "Drift", "package": "drift" },
+          "packages": [
+            { "name": "drift", "version": "^2.0.0", "use": "Typed SQLite access, migrations and reactive queries" },
+            { "name": "sqlite3_flutter_libs", "version": "^0.5.0", "use": "The bundled SQLite binary Drift runs against" },
+            { "name": "path_provider", "version": "^2.0.0", "use": "Resolving the on-device path the database file lives at" },
+            { "name": "drift_dev", "version": "^2.0.0", "dev": true, "use": "Generating the Drift database and companions" }
+          ]
+        },
+        {
+          "id": "hive",
+          "label": "Hive CE",
+          "hint": "key-value boxes for structured objects",
+          "vars": { "store": "box", "model": "adapter", "sdk": "Hive", "package": "hive_ce" },
+          "packages": [
+            { "name": "hive_ce", "version": "^2.0.0", "use": "Key-value boxes holding structured local objects" },
+            { "name": "hive_ce_flutter", "version": "^2.0.0", "use": "Hive initialisation against the app's documents directory" },
+            { "name": "hive_ce_generator", "version": "^1.0.0", "dev": true, "use": "Generating box adapters from @GenerateAdapters" }
+          ]
+        },
+        {
+          "id": "isar",
+          "label": "Isar",
+          "hint": "indexed object database with queries and watchers",
+          "vars": { "store": "collection", "model": "collection class", "sdk": "Isar", "package": "isar" },
+          "packages": [
+            { "name": "isar", "version": "^3.1.0", "use": "Indexed local object database with queries and watchers" },
+            { "name": "isar_flutter_libs", "version": "^3.1.0", "use": "The native Isar binary the app links against" },
+            { "name": "path_provider", "version": "^2.0.0", "use": "Resolving the on-device directory the database lives in" },
+            { "name": "isar_generator", "version": "^3.1.0", "dev": true, "use": "Generating collection schemas" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "i18n",
+      "question": "Localization",
+      "detail": "How a user-visible string is written. Every skill forbids literals in the widget tree either way.",
+      "default": "intl",
+      "choices": [
+        {
+          "id": "intl",
+          "label": "Flutter gen_l10n (ARB + intl)",
+          "hint": "the SDK's own generator",
+          "vars": { "call": "context.l10n.itemsTitle", "source": "lib/l10n/app_en.arb", "sdk": "gen_l10n", "package": "intl" },
+          "packages": [
+            { "name": "flutter_localizations", "use": "Material and Cupertino localizations, from the SDK" },
+            { "name": "intl", "version": "^0.20.0", "use": "Message formatting, dates, numbers and plurals" }
+          ]
+        },
+        {
+          "id": "slang",
+          "label": "slang",
+          "hint": "typed, nested, no BuildContext needed",
+          "vars": { "call": "t.items.title", "source": "lib/i18n/strings_en.i18n.json", "sdk": "slang", "package": "slang" },
+          "packages": [
+            { "name": "slang", "version": "^4.0.0", "use": "Typed translation access generated from the string sources" },
+            { "name": "slang_flutter", "version": "^4.0.0", "use": "Locale binding and the translation provider widget" },
+            { "name": "flutter_localizations", "use": "Material and Cupertino localizations, from the SDK" },
+            { "name": "slang_build_runner", "version": "^4.0.0", "dev": true, "use": "Generating the typed translations" }
+          ]
+        },
+        {
+          "id": "none",
+          "label": "Single locale, strings in code",
+          "hint": "a strings class, not literals in widgets",
+          "vars": { "call": "AppStrings.itemsTitle", "source": "lib/shared/strings.dart", "sdk": "a strings class", "package": "none" },
+          "packages": []
+        }
+      ]
+    },
+    {
+      "id": "env",
+      "question": "Environment configuration",
+      "detail": "How a per-flavor value reaches the app, and where a secret must not go.",
+      "default": "envied",
+      "choices": [
+        {
+          "id": "envied",
+          "label": "envied",
+          "hint": "obfuscated generated constants from .env.<flavor>",
+          "vars": { "sdk": "envied", "source": ".env.<flavor>", "package": "envied" },
+          "packages": [
+            { "name": "envied", "version": "^1.0.0", "use": "Per-flavor configuration as obfuscated generated constants" },
+            { "name": "envied_generator", "version": "^1.0.0", "dev": true, "use": "Generating the env classes from .env files" }
+          ]
+        },
+        {
+          "id": "dart_define",
+          "label": "--dart-define-from-file",
+          "hint": "JSON per flavor, read through String.fromEnvironment",
+          "vars": { "sdk": "dart-define", "source": "config/<flavor>.json", "package": "none" },
+          "packages": []
+        }
+      ]
+    }
+  ],
+  "skills": [
+    { "name": "flutter-dev", "role": "router" },
+    { "name": "flutter-architecture", "role": "reference" },
+    { "name": "flutter-api-integration", "role": "ticket" },
+    { "name": "flutter-state-management", "role": "ticket" },
+    { "name": "flutter-dependency-injection", "role": "ticket" },
+    { "name": "flutter-error-handling", "role": "ticket" },
+    { "name": "flutter-ui-implement", "role": "ticket" },
+    { "name": "flutter-navigation", "role": "ticket" },
+    { "name": "flutter-data-persistence", "role": "ticket" },
+    { "name": "flutter-observability", "role": "ticket", "if": "analytics!=none || crash!=none || logging!=none" },
+    { "name": "flutter-push-notifications", "role": "ticket", "if": "notifications!=none" },
+    { "name": "flutter-localization", "role": "ticket", "if": "i18n!=none" },
+    { "name": "flutter-screen-review", "role": "review" }
+  ],
+  "checks": [
+    {
+      "name": "generate",
+      "run": "dart run build_runner build --delete-conflicting-outputs",
+      "when": "pubspec.yaml"
+    }
+  ],
+  "stack": {
+    "summary": "Flutter with Clean Architecture per feature. A feature owns `presentation/`, `domain/` and `data/`, its routes and its endpoint paths; dependencies point inward, so `domain/` imports neither Dio nor a DTO. Every dependency is a generated Riverpod provider, every seam returns `Either<Failure, T>` instead of throwing, and `bootstrap/` is the one composition root where adapters are chosen per flavor.",
+    "layout": [
+      "lib/",
+      "├── main.dart                 # runZonedGuarded → flavor → bootstrap",
+      "├── app.dart                  # MaterialApp.router: theme, locale, router",
+      "├── flavors.dart              # Flavor enum and the accessor the app reads",
+      "├── bootstrap/                # ProviderContainer, SDK init, adapter selection",
+      "├── core/",
+      "│   ├── configurations/       # per-flavor configuration and its accessor",
+      "│   ├── di/                   # composition-root providers and flavor overrides",
+      "│   ├── error/                # Failure, capture, guards, response policy",
+      "│   ├── navigation/           # AppRouter, FeatureRouteSet, route gating",
+      "│   ├── network/              # Dio clients, interceptors, call adapter",
+      "│   ├── observability/        # AnalyticsSink, CrashReporter, AppLogger ports",
+      "│   ├── platform/             # narrow ports over device capabilities",
+      "│   └── storage/              # secure storage, preferences, local database",
+      "├── features/<feature>/",
+      "│   ├── data/                 # api, dto, mappers, repository impls",
+      "│   ├── domain/               # entities, repository interfaces, modules",
+      "│   ├── presentation/         # pages, widgets, view models",
+      "│   ├── <feature>_routes.dart # paths and GoRoutes this feature owns",
+      "│   └── <feature>_urls.dart   # endpoint paths this feature calls",
+      "└── shared/                   # theme tokens, reusable widgets, extensions",
+      "",
+      "test/                         # mirrors lib/, one folder per feature"
+    ],
+    "conventions": [
+      "**Layer direction.** `presentation → domain → data ports`, with data implementations depending inward on domain contracts. A file under `domain/` that imports `dio`, a DTO or a Flutter widget is in the wrong layer.",
+      "**Files are snake_case, types are UpperCamelCase, and the file is named after its type**: `item_repository.dart` holds `ItemRepository`. A provider file is `<thing>_provider.dart` beside the implementation it builds.",
+      "**Generated output is machine-owned.** Never hand-edit `*.g.dart` or `*.freezed.dart`; edit the annotated source and run the `generate` check.",
+      "**A feature is vertical.** New behaviour adds a folder under `features/`, not a layer under `core/`. Something lands in `core/` only once two features need it.",
+      "**Failures are values.** A seam captures the exception and returns `Either<Failure, T>`; `Right` is success. Nothing above the seam catches, and nothing below it throws across a layer boundary.",
+      "**One owner per lifecycle.** App state is a module with a snapshot and a replaying stream; page behaviour is an auto-dispose ViewModel; widgets own only controllers and transient visuals."
+    ],
+    "packages": [
+      { "name": "flutter_riverpod", "version": "^3.0.0", "use": "The only dependency graph and the only state container" },
+      { "name": "riverpod_annotation", "version": "^4.0.0", "use": "Annotations the provider generator reads" },
+      { "name": "go_router", "version": "^17.0.0", "use": "Declarative routing, shell branches and redirects" },
+      { "name": "dio", "version": "^5.0.0", "use": "HTTP transport, interceptors and cancellation" },
+      { "name": "retrofit", "version": "^4.0.0", "use": "Typed API interfaces generated over Dio" },
+      { "name": "dartz", "version": "^0.10.0", "use": "Either<Failure, T>, the return type of every seam" },
+      { "name": "freezed_annotation", "version": "^3.0.0", "use": "Immutable entities, DTOs and state unions" },
+      { "name": "json_annotation", "version": "^4.0.0", "use": "JSON serialisation annotations for DTOs" },
+      { "name": "equatable", "version": "^2.0.0", "use": "Value equality where a Freezed class would be too much" },
+      { "name": "flutter_secure_storage", "version": "^10.0.0", "use": "Tokens, credentials and anything that must not reach preferences" },
+      { "name": "shared_preferences", "version": "^2.0.0", "use": "Small non-sensitive scalars such as the selected locale" },
+      { "name": "build_runner", "version": "^2.0.0", "dev": true, "use": "Running every generator the stack depends on" },
+      { "name": "freezed", "version": "^3.0.0", "dev": true, "use": "Generating immutable classes and unions" },
+      { "name": "json_serializable", "version": "^6.0.0", "dev": true, "use": "Generating fromJson and toJson" },
+      { "name": "retrofit_generator", "version": "^10.0.0", "dev": true, "use": "Generating the Retrofit API implementations" },
+      { "name": "riverpod_generator", "version": "^4.0.0", "dev": true, "use": "Generating providers from @riverpod" },
+      { "name": "riverpod_lint", "version": "^3.0.0", "dev": true, "use": "Catching provider misuse the analyzer cannot" },
+      { "name": "custom_lint", "version": "^0.8.0", "dev": true, "use": "The runner riverpod_lint plugs into" },
+      { "name": "flutter_lints", "version": "^6.0.0", "dev": true, "use": "The analyzer rule set the project lints against" }
+    ]
+  }
+}

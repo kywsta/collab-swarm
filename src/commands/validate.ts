@@ -8,7 +8,7 @@ import { fail, ok, out, style, warn } from '../util/log.js';
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const packs = loadPacks(root, config.packs);
+  const packs = loadPacks(root, config.packs, config.packOptions);
   const asJson = flagBool(args, 'json');
 
   const target = args.positional[0];

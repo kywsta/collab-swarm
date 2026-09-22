@@ -7,9 +7,9 @@ The feature register below is the backlog every human and agent picks from, and 
 - A row is **blocked** while a dependency is not done, a gate it names is open, or a decision it names has neither an answer nor a working assumption.
 
 ```bash
-npx swarm status      # the whole board
-npx swarm next        # the best unclaimed rows
-npx swarm claim <slug>
+npx collab-swarm status      # the whole board
+npx collab-swarm next        # the best unclaimed rows
+npx collab-swarm claim <slug>
 ```
 
 ## Delivery principles

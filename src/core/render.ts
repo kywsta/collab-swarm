@@ -61,7 +61,7 @@ export function renderNext(board: Board, options: RenderOptions = {}): string {
     }
   }
   if (picks.length > 0) {
-    lines.push(style.dim(`Claim one: ${options.claimCommand ?? 'swarm claim <slug>'}`));
+    lines.push(style.dim(`Claim one: ${options.claimCommand ?? 'npx collab-swarm claim <slug>'}`));
   }
   return lines.join('\n');
 }

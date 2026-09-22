@@ -1,4 +1,4 @@
-import { readTextOrNull } from '../util/fs.js';
+import { readPackFile } from '../packs.js';
 import { CliError } from '../util/log.js';
 import { readFrontMatter, toYaml } from '../util/yaml.js';
 import { renderMemoryBlock } from './memory.js';
@@ -59,7 +59,7 @@ export function renderRules(
 ): Map<string, string> {
   const rendered = new Map<string, string>();
   for (const rule of context.rules) {
-    const text = readTextOrNull(rule.path) ?? '';
+    const text = readPackFile(rule, rule.path) ?? '';
     const front = readFrontMatter(text);
     const body = repointWorkflowLinks(front ? front.body : text, ruleDir, payloadRoot);
     const name = dialect === 'cursor' ? rule.file.replace(/\.md$/, '.mdc') : rule.file;
@@ -74,7 +74,8 @@ const claudeSettings = (context: EmitContext) =>
       $schema: 'https://json.schemastore.org/claude-code-settings.json',
       permissions: {
         allow: [
-          'Bash(npx swarm:*)',
+          'Bash(npx collab-swarm:*)',
+          'Bash(collab-swarm:*)',
           'Bash(swarm:*)',
           'Bash(git status:*)',
           'Bash(git diff:*)',
@@ -179,13 +180,14 @@ export const cursor: Target = {
 };
 
 /**
- * A slash command per coordinator and stage skill, for the tools that expose
- * saved prompts. Each one hands straight to the skill so there is a single
- * source of behaviour.
+ * A slash command per skill a user may start themselves, for the tools that
+ * expose saved prompts. Each one hands straight to the skill so there is a
+ * single source of behaviour. Routers and ticket skills are left out: they are
+ * reached from inside the workflow, by `implement` and by a ticket's `skills`.
  */
 function commandFiles(context: EmitContext, dir: string, extension: string): Emission[] {
   return context.skills
-    .filter((skill) => skill.role === 'coordinator' || skill.role === 'stage')
+    .filter((skill) => ['coordinator', 'stage', 'review'].includes(skill.role))
     .map((skill) =>
       managed(
         `${dir}/${skill.name}.${extension}`,
