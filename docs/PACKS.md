@@ -4,7 +4,7 @@ The core workflow is deliberately ignorant of your stack. It knows how to turn a
 
 Two kinds of pack, same format:
 
-- **A published pack** for a stack somebody has already packaged — installed with `npm install -D collab-swarm-pack-go && npx swarm add collab-swarm-pack-go`, and written to be true of every project using that stack. This document is how you write one.
+- **A published pack** for a stack somebody has already packaged — installed with `npm install -D collab-swarm-pack-go && npx collab-swarm add collab-swarm-pack-go`, and written to be true of every project using that stack. This document is how you write one.
 - **A stack pack for one project**, written from that project's own code: the call adapter everything routes through, the base class every handler extends, the wrapper used instead of raw exceptions. None of that generalises, so it is authored in the repository rather than installed. Ask an agent to run the `to-pack` skill, which researches the codebase and writes it into `.collab-swarm/packs/<name>/`. Everything below still applies — `to-pack` follows this format.
 
 ## What a pack contributes
@@ -68,7 +68,7 @@ Role is the pack's most important decision: it decides how a skill can be reache
 
 Most pack skills are `ticket`. Use `reference` for a skill that shapes a decision but never owns a slice of work — a design vocabulary, a concurrency model, a house style. A reference skill listed in a ticket's `skills` is a validation error, because scheduling it implies an owner it does not have.
 
-Ship a **router** once the pack has four or more concerns. Without one, an agent reads every concern skill on every slice; with one, it reads the router and then only what the slice needs. `swarm doctor` says so when a pack crosses that line.
+Ship a **router** once the pack has four or more concerns. Without one, an agent reads every concern skill on every slice; with one, it reads the router and then only what the slice needs. `npx collab-swarm doctor` says so when a pack crosses that line.
 
 Ship a **review** skill for a surface whose correctness a diff cannot show — a rendered screen against its design, a query plan, an accessibility pass. `deliver-change` runs every review-role skill at feature review, for the surfaces that changed.
 
@@ -76,9 +76,107 @@ Packs may not add `coordinator` or `stage` skills that replace the core ones; a 
 
 ### Checks
 
-Checks are *suggested*, not imposed: `swarm add` shows them and asks before appending to `collab-swarm.yml`. A check whose `name` the project already uses is skipped, so a pack never silently replaces a command the team tuned.
+Checks are *suggested*, not imposed: `npx collab-swarm add` shows them and asks before appending to `collab-swarm.yml`. A check whose `name` the project already uses is skipped, so a pack never silently replaces a command the team tuned.
 
 Fields: `run` (required), `name`, `focus` (`{path}` is substituted by `check --focus`), `ci` (used by `check --ci`), and `when` (a path that must exist for the check to run).
+
+## Options: the questions a pack asks
+
+A stack is rarely one thing. The core of a Flutter app is fixed — the state container, the router, the HTTP stack — but a handful of slots are filled differently by every team: which push provider, which local database, which analytics. A pack that hard-codes one answer is wrong for everybody else; one that hedges across all of them stops naming anything concrete, which was the only reason a skill was worth its tokens.
+
+A pack declares those slots as `options`. The project answers once, `npx collab-swarm add` records the answers in `collab-swarm.yml`, and everything downstream resolves against them — so a teammate's `npm install && npx collab-swarm sync` reproduces the same files without another interview.
+
+```json
+"options": [
+  {
+    "id": "database",
+    "question": "Structured local database",
+    "detail": "Secure storage and preferences are in the pack either way.",
+    "default": "none",
+    "choices": [
+      { "id": "none", "label": "None beyond secure storage and preferences" },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "hint": "typed SQL, migrations, reactive queries",
+        "vars": { "store": "database" },
+        "packages": [
+          { "name": "drift", "version": "^2.0.0", "use": "Typed SQLite access and migrations" },
+          { "name": "drift_dev", "version": "^2.0.0", "dev": true, "use": "Generating the database" }
+        ]
+      }
+    ]
+  }
+]
+```
+
+Three mechanisms use the answers, all of them greppable in the pack's own sources.
+
+### `if` — whether a thing exists at all
+
+A condition on a manifest skill entry, a rule's front matter, a check, or a declared package:
+
+```text
+database=drift                    the answer is drift
+database=drift,isar               the answer is either
+notifications!=none               the answer is anything but none
+database!=none && analytics=firebase
+analytics!=none || crash!=none    one concern reached from either answer
+```
+
+`||` binds looser than `&&`, and there is no grouping: a condition needing parentheses is a concern that should have been two. A condition naming an option the pack does not declare is true, so a filter nobody answered never removes a skill.
+
+A skill ruled out is not installed — not installed and greyed out, not installed and empty. It cannot be routed to, named by a ticket, or read by mistake, and `pack options` removes it from every target when an answer changes.
+
+### `<!-- swarm:if -->` — the prose that varies
+
+Inside any skill or rule body, on its own line for a block or inline for a clause:
+
+```markdown
+<!-- swarm:if database=drift -->
+Every schema change needs a migration **and** a test that runs it.
+<!-- swarm:else -->
+Add a database package before the first store.
+<!-- swarm:endif -->
+
+Put secrets in secure storage<!-- swarm:if database!=none -->, structured objects in the {{database.store}}<!-- swarm:endif -->, and blobs in files.
+```
+
+A conditional inside a fenced code block is shown, not run — a pack documenting this syntax would otherwise have its own examples rewritten. A `{{variable}}` inside a fence *is* interpolated, because a code sample naming the real adapter is the point of one.
+
+### `{{option}}` and `{{option.var}}` — the identifiers that vary
+
+`{{database}}` is the chosen id, `{{database.label}}` its label, and `{{database.store}}` whatever the choice declared under `vars`. An interpolation nothing defines is left in place rather than blanked, and `npx collab-swarm validate` reports it as an error — a hole in published prose is worse than a loud one in the pack.
+
+### Writing an option well
+
+- **Ask about what genuinely varies.** An option per library is an interview nobody finishes. Ask about the slots a team actually decides.
+- **Give every option a `none`** unless the stack cannot work without one, and make sure the pack still reads correctly with it chosen.
+- **Pick the mainstream default.** It is what `--yes`, CI and a scripted `init` will take.
+- **Keep the fixed core fixed.** If swapping an answer would rewrite every skill, it is not an option — it is a different pack.
+
+## Declaring the stack
+
+A pack may describe the architecture it installs. It is rendered into `AGENTS.md` and `CLAUDE.md`, so an agent reads it before it decides which skill to open, and reaches for a library the project already has rather than adding one.
+
+```json
+"stack": {
+  "summary": "One paragraph: the architecture in a sentence.",
+  "layout": ["lib/", "├── core/", "└── features/<feature>/"],
+  "conventions": ["**Layer direction.** presentation → domain → data ports.", "..."],
+  "packages": [
+    { "name": "go_router", "version": "^17.0.0", "use": "Routing, shell branches and redirects" }
+  ]
+}
+```
+
+`packages` is joined with the packages the chosen options bring in, de-duplicated by name. Declaring a package documents it; nothing is written to the project's dependency manifest, because adding a dependency is the agent's job when a ticket needs it.
+
+`detect` lists files whose presence suggests the pack, so `npx collab-swarm init` offers the matching one first:
+
+```json
+"detect": ["pubspec.yaml"]
+```
 
 ## Writing the skill
 
@@ -122,16 +220,16 @@ Recipe: [`http-endpoint`](../skills/http-endpoint/SKILL.md).
 
 `paths` is required and must match something. The emitter translates it per target: Claude Code keeps `paths`, Cursor gets `globs` plus `alwaysApply`, and links to the workflow documents are repointed so they resolve from wherever that target keeps its rules.
 
-Keep the `Recipe:` link to the skill that satisfies the rule. It is how a reader gets from the invariant to the procedure, and `npx swarm steps` reads it too: a rule that links to a skill is reported as in force for every step of it, which is the only way an invariant scoped to source files can be tied to the work that writes them.
+Keep the `Recipe:` link to the skill that satisfies the rule. It is how a reader gets from the invariant to the procedure, and `npx collab-swarm steps` reads it too: a rule that links to a skill is reported as in force for every step of it, which is the only way an invariant scoped to source files can be tied to the work that writes them.
 
 ## Testing a pack
 
 ```bash
 # From a scratch repository with collab-swarm already installed:
-npx swarm add ../path/to/your-pack
-npx swarm packs          # roles and rule scopes, as installed
-npx swarm steps <skill>  # your steps, their completion criteria, and the rules in force
-npx swarm validate       # a ticket may now name your ticket skills
+npx collab-swarm add ../path/to/your-pack
+npx collab-swarm packs          # roles and rule scopes, as installed
+npx collab-swarm steps <skill>  # your steps, their completion criteria, and the rules in force
+npx collab-swarm validate       # a ticket may now name your ticket skills
 ```
 
 Confirm four things:
@@ -147,10 +245,10 @@ Name the package `collab-swarm-pack-<name>` (or scope it, `@acme/collab-swarm-pa
 
 ```bash
 npm install -D collab-swarm-pack-go
-npx swarm add collab-swarm-pack-go
+npx collab-swarm add collab-swarm-pack-go
 ```
 
-The pack spec is recorded in `collab-swarm.yml`, so a teammate's `npm install && npx swarm sync` reproduces the same agent files exactly.
+The pack spec is recorded in `collab-swarm.yml`, so a teammate's `npm install && npx collab-swarm sync` reproduces the same agent files exactly.
 
 ## Porting an existing skill set
 
@@ -159,5 +257,5 @@ If you already have skills in `.claude/skills/`, a pack is mostly a move:
 1. Copy the skill directories into `skills/`.
 2. Write the manifest, assigning a role to each.
 3. Replace every repository-specific path with the source kind it stands for (`docs/prd/**` becomes "the project's product source").
-4. Replace project-specific commands with `npx swarm check`.
+4. Replace project-specific commands with `npx collab-swarm check`.
 5. Move the always-on invariants into `rules/`, scoped with `paths`.

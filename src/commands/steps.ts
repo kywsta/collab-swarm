@@ -80,8 +80,8 @@ function renderOverview(map: ReturnType<typeof buildStepMap>, project: string, p
   }
 
   out('');
-  out(style.dim('  One skill in full: npx swarm steps <skill>'));
-  out(style.dim('  By rule instead:   npx swarm steps --rules'));
+  out(style.dim('  One skill in full: npx collab-swarm steps <skill>'));
+  out(style.dim('  By rule instead:   npx collab-swarm steps --rules'));
   out('');
 }
 
@@ -165,7 +165,7 @@ function renderRules(rules: RuleCoverage[], plans: string): void {
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const packs = loadPacks(root, config.packs);
+  const packs = loadPacks(root, config.packs, config.packOptions);
   const map = buildStepMap(packs, { plansDir: config.plans });
 
   const wanted = args.positional[0];

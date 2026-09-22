@@ -1,4 +1,5 @@
 import { flagBool, type Args } from '../cli.js';
+import { PROGRAM } from '../util/program.js';
 import { loadConfig } from '../config.js';
 import { Claims } from '../core/claims.js';
 import { CliError, ok, out, style } from '../util/log.js';
@@ -7,7 +8,7 @@ import { buildBoard } from './board.js';
 export async function run(args: Args): Promise<number> {
   const slug = args.positional[0];
   if (!slug) {
-    throw new CliError('Name the row to claim.', 64, 'Usage: swarm claim <slug>');
+    throw new CliError('Name the row to claim.', 64, `Usage: ${PROGRAM} claim <slug>`);
   }
 
   const { config, root } = loadConfig();

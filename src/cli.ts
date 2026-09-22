@@ -3,6 +3,9 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CliError, err, out, style } from './util/log.js';
+import { PROGRAM } from './util/program.js';
+
+export { BINS, INVOCATION, PROGRAM } from './util/program.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const VERSION: string = (() => {
@@ -62,16 +65,18 @@ export const flagString = (args: Args, name: string): string | null => {
 
 export const flagBool = (args: Args, name: string): boolean => args.flags.has(name);
 
-const HELP = `${style.bold('swarm')} — spec-driven delivery for humans and coding agents.
+const HELP = `${style.bold(PROGRAM)} — spec-driven delivery for humans and coding agents.
 
 ${style.bold('Usage')}
-  swarm <command> [options]
+  ${PROGRAM} <command> [options]
 
 ${style.bold('Set up')}
   init                     Install the workflow into this repository
   sync [--check] [--force] Re-apply skills, rules and instructions after an upgrade
-  add <pack...>            Attach a language or framework skill pack
+  add <pack...>            Attach a skill pack: a default pack, an npm package, or a path
   packs                    List installed packs and what each contributes
+  pack list                The default packs shipped with collab-swarm
+  pack options <pack>      Re-answer what a pack asked, and re-apply it
   pack new <name>          Scaffold a skill pack for this project's own stack
   steps [<skill>]          Show what each skill does, step by step, and the rules in force
   doctor                   Check the installation and report what is missing
@@ -87,6 +92,7 @@ ${style.bold('Deliver')}
 ${style.bold('Options')}
   --no-fetch               Read the board without contacting the remote
   --json                   Machine-readable output where supported
+  --options k=v,k=v        Answer a pack's questions without prompting
   --yes                    Accept defaults without prompting
   -h, --help               Show this help
   -v, --version            Show the version
@@ -128,7 +134,7 @@ async function dispatch(args: Args): Promise<number> {
       throw new CliError(
         `Unknown command "${args.command}".`,
         64,
-        'Run `swarm help` to see the commands.',
+        `Run \`${PROGRAM} help\` to see the commands.`,
       );
   }
 }

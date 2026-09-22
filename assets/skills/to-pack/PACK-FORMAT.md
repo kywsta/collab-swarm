@@ -16,7 +16,7 @@ The anatomy of the four things a stack pack contains. Read this before writing a
     └── <concern>.md
 ```
 
-`swarm pack new` writes this shape with every file stubbed. Fill the stubs; never leave one with an empty `description`, because that is the line an agent reads to decide whether to open the skill at all.
+`npx collab-swarm pack new` writes this shape with every file stubbed. Fill the stubs; never leave one with an empty `description`, because that is the line an agent reads to decide whether to open the skill at all.
 
 ## Roles
 
@@ -94,9 +94,9 @@ Apply with [<sibling concern>](<sibling>.md).
 - <Invariant.>
 ```
 
-Three or four invariants: the ones a reviewer would catch and a newcomer would miss. `paths` is required and must match something real — run `npx swarm steps --rules` afterwards and confirm the rule lands where you meant.
+Three or four invariants: the ones a reviewer would catch and a newcomer would miss. `paths` is required and must match something real — run `npx collab-swarm steps --rules` afterwards and confirm the rule lands where you meant.
 
-Keep the `Recipe:` link. It is how a reader gets from the invariant to the procedure, and `swarm steps` reads it to report the rule as in force for every step of that skill.
+Keep the `Recipe:` link. It is how a reader gets from the invariant to the procedure, and `npx collab-swarm steps` reads it to report the rule as in force for every step of that skill.
 
 ## The router
 
@@ -148,7 +148,7 @@ diff.
 ```
 
 Write it as a numbered sequence, like every other skill that runs. A router
-written as a bare table has no completion criterion, and `swarm steps` reports
+written as a bare table has no completion criterion, and `npx collab-swarm steps` reports
 it among the documents that are read rather than run.
 
 The routing table's left column is the vocabulary a ticket is written in, not a list of file types. "Provider, lifetime, override, composition root" routes better than "dependency injection files", because the ticket says the former.
@@ -183,9 +183,107 @@ location, and consequence.
 
 Report findings as `blocking` or `advisory`, with the same shape `code-review` uses, so `deliver-change` can merge them into one report. A review skill reports; it does not repair.
 
+## Options: the questions a pack asks
+
+A stack is rarely one thing. The core of a Flutter app is fixed — the state container, the router, the HTTP stack — but a handful of slots are filled differently by every team: which push provider, which local database, which analytics. A pack that hard-codes one answer is wrong for everybody else; one that hedges across all of them stops naming anything concrete, which was the only reason a skill was worth its tokens.
+
+A pack declares those slots as `options`. The project answers once, `npx collab-swarm add` records the answers in `collab-swarm.yml`, and everything downstream resolves against them — so a teammate's `npm install && npx collab-swarm sync` reproduces the same files without another interview.
+
+```json
+"options": [
+  {
+    "id": "database",
+    "question": "Structured local database",
+    "detail": "Secure storage and preferences are in the pack either way.",
+    "default": "none",
+    "choices": [
+      { "id": "none", "label": "None beyond secure storage and preferences" },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "hint": "typed SQL, migrations, reactive queries",
+        "vars": { "store": "database" },
+        "packages": [
+          { "name": "drift", "version": "^2.0.0", "use": "Typed SQLite access and migrations" },
+          { "name": "drift_dev", "version": "^2.0.0", "dev": true, "use": "Generating the database" }
+        ]
+      }
+    ]
+  }
+]
+```
+
+Three mechanisms use the answers, all of them greppable in the pack's own sources.
+
+### `if` — whether a thing exists at all
+
+A condition on a manifest skill entry, a rule's front matter, a check, or a declared package:
+
+```text
+database=drift                    the answer is drift
+database=drift,isar               the answer is either
+notifications!=none               the answer is anything but none
+database!=none && analytics=firebase
+analytics!=none || crash!=none    one concern reached from either answer
+```
+
+`||` binds looser than `&&`, and there is no grouping: a condition needing parentheses is a concern that should have been two. A condition naming an option the pack does not declare is true, so a filter nobody answered never removes a skill.
+
+A skill ruled out is not installed — not installed and greyed out, not installed and empty. It cannot be routed to, named by a ticket, or read by mistake, and `pack options` removes it from every target when an answer changes.
+
+### `<!-- swarm:if -->` — the prose that varies
+
+Inside any skill or rule body, on its own line for a block or inline for a clause:
+
+```markdown
+<!-- swarm:if database=drift -->
+Every schema change needs a migration **and** a test that runs it.
+<!-- swarm:else -->
+Add a database package before the first store.
+<!-- swarm:endif -->
+
+Put secrets in secure storage<!-- swarm:if database!=none -->, structured objects in the {{database.store}}<!-- swarm:endif -->, and blobs in files.
+```
+
+A conditional inside a fenced code block is shown, not run — a pack documenting this syntax would otherwise have its own examples rewritten. A `{{variable}}` inside a fence *is* interpolated, because a code sample naming the real adapter is the point of one.
+
+### `{{option}}` and `{{option.var}}` — the identifiers that vary
+
+`{{database}}` is the chosen id, `{{database.label}}` its label, and `{{database.store}}` whatever the choice declared under `vars`. An interpolation nothing defines is left in place rather than blanked, and `npx collab-swarm validate` reports it as an error — a hole in published prose is worse than a loud one in the pack.
+
+### Writing an option well
+
+- **Ask about what genuinely varies.** An option per library is an interview nobody finishes. Ask about the slots a team actually decides.
+- **Give every option a `none`** unless the stack cannot work without one, and make sure the pack still reads correctly with it chosen.
+- **Pick the mainstream default.** It is what `--yes`, CI and a scripted `init` will take.
+- **Keep the fixed core fixed.** If swapping an answer would rewrite every skill, it is not an option — it is a different pack.
+
+## Declaring the stack
+
+A pack may describe the architecture it installs. It is rendered into `AGENTS.md` and `CLAUDE.md`, so an agent reads it before it decides which skill to open, and reaches for a library the project already has rather than adding one.
+
+```json
+"stack": {
+  "summary": "One paragraph: the architecture in a sentence.",
+  "layout": ["lib/", "├── core/", "└── features/<feature>/"],
+  "conventions": ["**Layer direction.** presentation → domain → data ports.", "..."],
+  "packages": [
+    { "name": "go_router", "version": "^17.0.0", "use": "Routing, shell branches and redirects" }
+  ]
+}
+```
+
+`packages` is joined with the packages the chosen options bring in, de-duplicated by name. Declaring a package documents it; nothing is written to the project's dependency manifest, because adding a dependency is the agent's job when a ticket needs it.
+
+`detect` lists files whose presence suggests the pack, so `npx collab-swarm init` offers the matching one first:
+
+```json
+"detect": ["pubspec.yaml"]
+```
+
 ## Checks
 
-Commands the pack needs that the project may not have configured — a code generator, a framework analyzer, a lint the framework ships. They are offered, not imposed: `swarm add` shows them and asks.
+Commands the pack needs that the project may not have configured — a code generator, a framework analyzer, a lint the framework ships. They are offered, not imposed: `npx collab-swarm add` shows them and asks.
 
 ```json
 "checks": [
@@ -193,4 +291,4 @@ Commands the pack needs that the project may not have configured — a code gene
 ]
 ```
 
-Use `when` for a check that only applies when a file exists, and `focus` for the variant `swarm check --focus <path>` runs during ticket verification.
+Use `when` for a check that only applies when a file exists, and `focus` for the variant `npx collab-swarm check --focus <path>` runs during ticket verification.

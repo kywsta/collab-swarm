@@ -11,12 +11,16 @@ import {
   type SourceConfig,
 } from '../config.js';
 import { Git } from '../core/git.js';
-import { corePack } from '../packs.js';
+import { askOptions, describePack, offerChecks, record } from '../attach.js';
+import { parseSelections } from '../options.js';
+import { bundledPacks, corePack, resolvePack, type Pack } from '../packs.js';
 import { applySync, planSync } from '../sync.js';
 import { TARGETS, targetIds } from '../targets/index.js';
 import { exists, readTextOrNull, writeText } from '../util/fs.js';
 import { CliError, heading, info, ok, out, style, warn } from '../util/log.js';
-import { confirm, input, interactive, multiSelect } from '../util/prompt.js';
+import { confirm, input, interactive, multiSelect, select } from '../util/prompt.js';
+import { PACKS_ROOT, scaffoldPack, type Planned } from './pack.js';
+import { isSlug, slugify } from '../util/yaml.js';
 
 /** Check suggestions per ecosystem, used only to prefill the config. */
 const ECOSYSTEMS: { when: string; name: string; checks: CheckConfig[] }[] = [
@@ -223,6 +227,8 @@ export async function run(args: Args): Promise<number> {
     },
   };
 
+  const stack = await chooseStackSkills(root, config, args, assumeYes);
+
   writeText(configPath, serializeConfig(config));
   ok(`Wrote ${CONFIG_FILE}`);
 
@@ -231,7 +237,191 @@ export async function run(args: Args): Promise<number> {
     ok(`Wrote ${backlogPath} — fill in the feature register and the swarm has a board`);
   }
 
-  return applyAndReport(root, config, args, true);
+  return applyAndReport(root, config, args, true, stack);
+}
+
+/**
+ * How this project gets skills for its own stack.
+ *
+ * The workflow plans and reviews without knowing the stack, and implements
+ * badly without it: with no pack attached, every agent writes from its own
+ * priors and the codebase drifts a little further apart with each ticket. So
+ * this is asked at `init` rather than left for later, with three honest
+ * answers — a default pack, a pack written from this repository, or not yet.
+ */
+type StackChoice = { kind: 'default' } | { kind: 'custom'; dir: string; router: string } | { kind: 'none' };
+
+const CUSTOM = 'custom';
+const LATER = 'later';
+
+async function chooseStackSkills(
+  root: string,
+  config: Config,
+  args: Args,
+  assumeYes: boolean,
+): Promise<StackChoice> {
+  const available = bundledPacks();
+  // A pack whose marker files are in this repository is almost always the
+  // right answer, so it is offered first and highlighted as the default.
+  const ranked = [...available].sort(
+    (a, b) => Number(suits(b, root)) - Number(suits(a, root)),
+  );
+  const suggested = ranked.find((pack) => suits(pack, root));
+
+  // `--pack flutter|custom|none` makes the choice scriptable, which is also
+  // the only way a run with no terminal reaches anything but "not now".
+  const requested = flagString(args, 'pack');
+  const asking = !requested && !assumeYes;
+  if (asking || requested) heading('Skills for this stack');
+  if (asking) {
+    out(
+      style.dim(
+        'The workflow knows how to plan, build test-first and review. It knows nothing about your\n' +
+          'framework: which HTTP client, which state container, where a route belongs. A pack supplies\n' +
+          'that — concern skills, path-scoped rules, the architecture, and the checks they need.',
+      ),
+    );
+  }
+
+  const answer = requested
+    ? requested
+    : assumeYes
+    ? LATER
+    : await select(
+        'Which skills should agents implement with?',
+        [
+          ...ranked.map((pack) => ({
+            value: pack.name,
+            label: pack.title,
+            hint: `· default pack${suits(pack, root) ? ' · matches this repository' : ''}`,
+          })),
+          {
+            value: CUSTOM,
+            label: "Write skills from this project's own stack",
+            hint: '· scaffolds a pack here for your agent to fill in',
+          },
+          { value: LATER, label: 'Not now', hint: '· npx collab-swarm add <pack> whenever you like' },
+        ],
+        suggested?.name ?? CUSTOM,
+      );
+
+  if (answer === LATER || answer === 'none') return { kind: 'none' };
+  if (answer === CUSTOM) return scaffoldCustomPack(root, config, assumeYes);
+
+  const preset = parseSelections(flagString(args, 'options') ?? '');
+  const answers = await askOptions(resolvePack(answer, root), {
+    preset,
+    ...(assumeYes ? { assumeYes } : {}),
+  });
+  const pack = resolvePack(answer, root, answers);
+  if (asking) out('');
+  describePack(pack);
+  record(config, answer, pack, answers);
+  config.checks.push(...(await offerChecks(config, pack, assumeYes)));
+  return { kind: 'default' };
+}
+
+/** True when the repository holds one of the files a pack says it is for. */
+const suits = (pack: Pack, root: string) => pack.detect.some((file) => exists(join(root, file)));
+
+/**
+ * Interviews the project about its stack and scaffolds a pack for it.
+ *
+ * The CLI cannot write the skills — that takes reading the codebase — so it
+ * writes what it can know: the shape, the roles, and a brief holding the
+ * answers. `to-pack` reads the brief and fills the stubs. The pack is left
+ * unattached, because publishing empty skills into every agent target would
+ * give an agent something to open and nothing to learn.
+ */
+async function scaffoldCustomPack(
+  root: string,
+  config: Config,
+  assumeYes: boolean,
+): Promise<StackChoice> {
+  if (!assumeYes) {
+    out('');
+    info('A few questions now, so your agent starts from your answers instead of guessing.');
+  }
+
+  const fallbackName = slugify(readProjectName(root) ?? 'stack') || 'stack';
+  const raw = await input('\nName for this pack', fallbackName);
+  const name = isSlug(raw) ? raw : slugify(raw) || fallbackName;
+
+  const summary = await input('The stack in one line (language, framework, architecture)', '');
+  const libraries = await input('Load-bearing libraries and tools, comma separated', '');
+  const concerns = await input(
+    'Concerns that each deserve their own skill, comma separated (blank: let the agent propose them)',
+    '',
+  );
+
+  const split = (value: string) =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+  const router = `${name}-dev`;
+  const skills: Planned[] = [
+    { name: router, role: 'router' },
+    ...split(concerns)
+      .map((concern) => slugify(concern))
+      .filter(Boolean)
+      .map((concern) => ({
+        name: concern.startsWith(`${name}-`) ? concern : `${name}-${concern}`,
+        role: 'ticket' as const,
+      })),
+  ];
+  const dir = `${PACKS_ROOT}/${name}`;
+  scaffoldPack({
+    dir: join(root, dir),
+    name,
+    title: summary ? summary.split(',')[0]!.trim() : name,
+    description: summary,
+    skills,
+    rules: skills.filter((skill) => skill.role === 'ticket').map((skill) => skill.name.replace(`${name}-`, '')),
+    brief: brief(config.project, summary, split(libraries), skills),
+  });
+
+  ok(`Scaffolded ${dir} — every file a stub, so an unwritten skill is visible rather than convincing`);
+  return { kind: 'custom', dir, router };
+}
+
+/** What the project said, in the file `to-pack` reads before it researches. */
+function brief(project: string, summary: string, libraries: string[], skills: Planned[]): string {
+  return [
+    `# Stack brief — ${project}`,
+    '',
+    'Written by `npx collab-swarm init` from what the project said. The `to-pack` skill reads this first,',
+    'then verifies every line against the repository: an answer here is a starting point, and the',
+    'code is the authority. Correct anything the code contradicts rather than preserving it.',
+    '',
+    '## The stack',
+    '',
+    summary || '_Not stated. Read the dependency manifest and the build config._',
+    '',
+    '## Load-bearing libraries',
+    '',
+    ...(libraries.length > 0
+      ? libraries.map(
+          (library) =>
+            `- **${library}** — what this project uses it for, which directories, and the convention it is held to: _to fill in from the code._`,
+        )
+      : ['_Not stated. Take them from the dependency manifest and its lockfile._']),
+    '',
+    '## Proposed concerns',
+    '',
+    ...(skills.filter((skill) => skill.role === 'ticket').length > 0
+      ? skills
+          .filter((skill) => skill.role === 'ticket')
+          .map((skill) => `- \`${skill.name}\` — invariants, files and failure modes of its own: _to confirm._`)
+      : ['_Not stated. Propose them from the code and confirm the list before writing any prose._']),
+    '',
+    '## Still to settle',
+    '',
+    '- Which third-party integrations are decided, and which are still open.',
+    '- Where the same thing is done two ways, and which way is current.',
+    '',
+  ].join('\n');
 }
 
 function readProjectName(root: string): string | null {
@@ -249,7 +439,13 @@ function readProjectName(root: string): string | null {
   return title?.trim() ?? null;
 }
 
-function applyAndReport(root: string, config: Config, _args: Args, fresh = false): number {
+function applyAndReport(
+  root: string,
+  config: Config,
+  _args: Args,
+  fresh = false,
+  stack: StackChoice = { kind: 'none' },
+): number {
   const plan = planSync(root, config, VERSION);
   const result = applySync(root, plan, config, VERSION);
 
@@ -271,14 +467,30 @@ function applyAndReport(root: string, config: Config, _args: Args, fresh = false
     out('  3. Commit the generated files so every teammate and agent shares them.');
     out('');
   }
-  out(`  Ask your agent: ${style.bold('"What\'s next?"')} or ${style.bold('"Make a plan to implement <feature>"')}`);
-  if (plan.packs.packs.every((pack) => pack.core)) {
+  if (stack.kind === 'custom') {
     out(
-      `  Give it skills for this stack: ${style.bold('"Write the skills for this project\'s stack"')} ` +
-        style.dim('(the `to-pack` skill researches the codebase and writes them)'),
+      `  Fill in the pack: ${style.bold('"Write the skills for this project\'s stack"')} ` +
+        style.dim(`(the \`to-pack\` skill reads ${stack.dir}/BRIEF.md, researches the code, and writes them)`),
+    );
+    out(style.dim(`  Then: npx collab-swarm add ${stack.dir} && npx collab-swarm steps ${stack.router}`));
+    out('');
+  }
+  out(`  Ask your agent: ${style.bold('"What\'s next?"')} or ${style.bold('"Make a plan to implement <feature>"')}`);
+  if (stack.kind !== 'custom' && plan.packs.packs.every((pack) => pack.core)) {
+    const available = bundledPacks();
+    if (available.length > 0) {
+      out(
+        `  Give it skills for this stack: ${style.dim(`npx collab-swarm add ${available.map((pack) => pack.name).join('|')}`)}`,
+      );
+    }
+    out(
+      `  Or from this repository's own code: ${style.bold('"Write the skills for this project\'s stack"')} ` +
+        style.dim('(the `to-pack` skill researches it and writes them)'),
     );
   }
-  out(style.dim('  Or attach a published one: npx swarm add <pack>'));
+  if (stack.kind === 'default') {
+    out(style.dim('  Change what the pack asked: npx collab-swarm pack options <pack>'));
+  }
   return 0;
 }
 

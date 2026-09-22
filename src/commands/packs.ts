@@ -5,7 +5,7 @@ import { heading, out, style } from '../util/log.js';
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const set = loadPacks(root, config.packs);
+  const set = loadPacks(root, config.packs, config.packOptions);
 
   if (flagBool(args, 'json')) {
     out(
@@ -15,6 +15,13 @@ export async function run(args: Args): Promise<number> {
           title: pack.title,
           spec: pack.spec,
           core: pack.core,
+          bundled: pack.bundled,
+          options: pack.options.map((option) => ({
+            id: option.id,
+            question: option.question,
+            chosen: pack.selections[option.id],
+            choices: option.choices.map((choice) => choice.id),
+          })),
           skills: pack.skills.map((skill) => ({ name: skill.name, role: skill.role })),
           rules: pack.rules.map((rule) => rule.file),
         })),
@@ -26,8 +33,13 @@ export async function run(args: Args): Promise<number> {
   }
 
   for (const pack of set.packs) {
-    heading(`${pack.title}${pack.core ? style.dim(' · built in') : style.dim(` · ${pack.spec}`)}`);
+    const origin = pack.core ? ' · built in' : pack.bundled ? ` · default pack · ${pack.spec}` : ` · ${pack.spec}`;
+    heading(`${pack.title}${style.dim(origin)}`);
     if (pack.description) out(`  ${pack.description}`);
+    for (const option of pack.options) {
+      const chosen = option.choices.find((choice) => choice.id === pack.selections[option.id]);
+      out(`  ${style.blue('?')} ${option.question}: ${style.bold(chosen?.label ?? '—')}`);
+    }
     for (const skill of pack.skills) {
       out(`  ${style.green('•')} ${style.bold(skill.name)} ${style.dim(`— ${ROLE_LABEL[skill.role]}`)}`);
     }
@@ -39,6 +51,9 @@ export async function run(args: Args): Promise<number> {
 
   out('');
   out(style.dim(`  ${set.skills.length} skills and ${set.rules.length} rules across ${set.packs.length} pack(s).`));
-  out(style.dim('  Add another: npx swarm add <npm-package|path>'));
+  if (set.packs.some((pack) => pack.options.length > 0 && !pack.core)) {
+    out(style.dim('  Change an answer: npx collab-swarm pack options <pack>'));
+  }
+  out(style.dim('  Add another: npx collab-swarm add <name|npm-package|path> · see the defaults: npx collab-swarm pack list'));
   return 0;
 }

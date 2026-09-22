@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { flagString, type Args } from '../cli.js';
+import { PROGRAM } from '../util/program.js';
 import { inRoot, loadConfig } from '../config.js';
 import { newPlan, serializePlan } from '../core/plan.js';
 import { exists, writeText } from '../util/fs.js';
@@ -20,7 +21,7 @@ export async function run(args: Args): Promise<number> {
     throw new CliError(
       'Name the feature.',
       64,
-      'Usage: swarm plan <slug> [--title "Feature title"]',
+      `Usage: ${PROGRAM} plan <slug> [--title "Feature title"]`,
     );
   }
   const slug = isSlug(raw) ? raw : slugify(raw);
@@ -53,7 +54,7 @@ export async function run(args: Args): Promise<number> {
   if (config.backlog) {
     out(
       style.dim(
-        `  Working from the board instead? "npx swarm claim ${slug}" also pushes the branch that tells everyone else the row is taken.`,
+        `  Working from the board instead? "npx collab-swarm claim ${slug}" also pushes the branch that tells everyone else the row is taken.`,
       ),
     );
   }

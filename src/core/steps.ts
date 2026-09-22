@@ -12,8 +12,8 @@
  */
 
 import { join } from 'node:path';
-import type { PackSet, RuleEntry, SkillEntry, SkillRole } from '../packs.js';
-import { listFiles, readTextOrNull } from '../util/fs.js';
+import { readPackFile, type PackSet, type RuleEntry, type SkillEntry, type SkillRole } from '../packs.js';
+import { listFiles } from '../util/fs.js';
 import { firstMatch } from '../util/glob.js';
 import { readFrontMatter } from '../util/yaml.js';
 
@@ -53,7 +53,7 @@ export interface Step {
   reads: string[];
   /** Skills the step mentions without handing work to them, such as a handback. */
   names: string[];
-  /** `npx swarm` commands the step involves. */
+  /** `npx collab-swarm` commands the step involves. */
   commands: string[];
   /** Files the step reads or writes, as repository paths. */
   artifacts: string[];
@@ -256,8 +256,11 @@ const INLINE_CODE = /`([^`\n]+)`/g;
 const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
 // A leading `.` is allowed only when a word character follows it, so a path
 // argument is captured whole while a sentence's closing period is not.
+// Every bin the CLI installs, longest first so `collab-swarm` is never read as
+// the `swarm` inside it. The `npx` prefix is required: without it, the word
+// "swarm" in ordinary prose would be picked up as a command.
 const COMMAND =
-  /npx swarm(?:[ \t]+(?:--?[a-z][a-z-]*|<[^>\n]+>|"[^"\n]*"|\.[\w./<>-]+|[A-Za-z][\w./-]*))*/g;
+  /npx[ \t]+(?:collab-swarm|cswarm|swarm)(?:[ \t]+(?:--?[a-z][a-z-]*|<[^>\n]+>|"[^"\n]*"|\.[\w./<>-]+|[A-Za-z][\w./-]*))*/g;
 const EXTENSION = /\.(?:md|ya?ml|json|txt|sh)$/;
 
 /**
@@ -422,7 +425,7 @@ function skillRules(
 function skillsPointedAt(rules: RuleEntry[], skills: SkillEntry[]): Map<string, Set<string>> {
   const map = new Map<string, Set<string>>();
   for (const rule of rules) {
-    const text = readTextOrNull(rule.path) ?? '';
+    const text = readPackFile(rule, rule.path) ?? '';
     const named = skills.filter((skill) => text.includes(`skills/${skill.name}/SKILL.md`));
     map.set(rule.file, new Set(named.map((skill) => skill.name)));
   }
@@ -440,7 +443,7 @@ export function readSkillMap(
   options: StepMapOptions,
   pointedAt = skillsPointedAt(packs.rules, packs.skills),
 ): SkillMap {
-  const text = readTextOrNull(join(skill.dir, 'SKILL.md')) ?? '';
+  const text = readPackFile(skill, join(skill.dir, 'SKILL.md')) ?? '';
   const front = readFrontMatter(text);
   const { heading, preamble, sections } = split(front ? front.body : text);
 

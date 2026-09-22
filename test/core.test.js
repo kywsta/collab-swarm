@@ -9,7 +9,8 @@ import { canTransition, newPlan, readPlan, readTickets, readyTickets, sectionBod
 import { Register } from '../dist/core/register.js';
 import { renderNext, renderStatus } from '../dist/core/render.js';
 import { Findings, validatePlan, validateRepository } from '../dist/core/validate.js';
-import { corePack, loadPacks, ticketSkills } from '../dist/packs.js';
+import { bundledPackNames, corePack, loadPacks, readPackFile, resolvePack, ticketSkills } from '../dist/packs.js';
+import { matches, parseSelections, renderText, unknownSelections, unresolvedMarkers, unresolvedVars } from '../dist/options.js';
 import { buildStepMap, resolveArtifact, rulesAtStep } from '../dist/core/steps.js';
 import { firstMatch, matchesGlob } from '../dist/util/glob.js';
 import { parseConfig, serializeConfig } from '../dist/config.js';
@@ -567,8 +568,17 @@ describe('step map', () => {
   });
 
   it('collects the swarm commands a step involves', () => {
-    assert.ok(skill('implement').steps[2].commands.includes('npx swarm check --focus <ticket test path>'));
-    assert.ok(skill('whats-next').steps[0].commands.includes('npx swarm next --lane "Dev 2"'));
+    assert.ok(skill('implement').steps[2].commands.includes('npx collab-swarm check --focus <ticket test path>'));
+    assert.ok(skill('whats-next').steps[0].commands.includes('npx collab-swarm next --lane "Dev 2"'));
+  });
+
+  it('still reads a command written with the older bin name', () => {
+    // A pack in the wild may say `npx swarm validate`. Losing its commands
+    // from the execution map would be a silent regression, not a loud one.
+    const legacy = packRootFor(join(tempRepo(), 'legacy-command'));
+    const map = buildStepMap(loadPacks(process.cwd(), [legacy]), { plansDir: '.docs/changes' });
+    const step = map.skills.find((entry) => entry.name === 'legacy-thing').steps[0];
+    assert.deepEqual(step.commands, ['npx swarm validate', 'npx collab-swarm check']);
   });
 
   it('reads a sequence numbered a heading level down', () => {
@@ -721,5 +731,336 @@ Recipe: [\`flutter-api-integration\`](../skills/flutter-api-integration/SKILL.md
     const messages = findings.warnings.map((finding) => finding.message);
     assert.ok(messages.some((message) => message.includes('declares no paths')));
     assert.ok(messages.some((message) => message.includes('has no description')));
+  });
+});
+
+/** A one-skill pack whose only step names a command in each spelling. */
+function packRootFor(dir) {
+  writeText(
+    join(dir, 'collab-swarm-pack.json'),
+    JSON.stringify({ name: 'legacy', collabSwarm: 1, skills: [{ name: 'legacy-thing', role: 'ticket' }] }),
+  );
+  writeText(
+    join(dir, 'skills', 'legacy-thing', 'SKILL.md'),
+    [
+      '---',
+      'name: legacy-thing',
+      'description: A concern written before the bin was renamed.',
+      '---',
+      '',
+      '# Legacy thing',
+      '',
+      '## 1. Do it',
+      '',
+      'Run `npx swarm validate`, then `npx collab-swarm check`.',
+      '',
+      'Done when both pass.',
+      '',
+    ].join('\n'),
+  );
+  return dir;
+}
+
+describe('pack options', () => {
+  const optionPack = (dir) => {
+    writeText(
+      join(dir, 'collab-swarm-pack.json'),
+      JSON.stringify({
+        name: 'stack',
+        title: 'Stack',
+        collabSwarm: 1,
+        detect: ['stack.toml'],
+        options: [
+          {
+            id: 'database',
+            question: 'Local database',
+            default: 'none',
+            choices: [
+              { id: 'none', label: 'None' },
+              {
+                id: 'drift',
+                label: 'Drift',
+                vars: { store: 'database' },
+                packages: [{ name: 'drift', use: 'Typed SQL' }],
+              },
+            ],
+          },
+          {
+            id: 'push',
+            question: 'Push',
+            default: 'fcm',
+            choices: [
+              { id: 'fcm', label: 'FCM', vars: { source: 'FcmSource' } },
+              { id: 'none', label: 'No push' },
+            ],
+          },
+        ],
+        skills: [
+          { name: 'stack-dev', role: 'router' },
+          { name: 'stack-storage', role: 'ticket', if: 'database!=none' },
+          { name: 'stack-push', role: 'ticket', if: 'push!=none' },
+        ],
+        checks: [{ name: 'generate', run: 'stack gen', if: 'database=drift' }],
+        stack: {
+          summary: 'A stack with slots.',
+          layout: ['src/'],
+          conventions: ['One owner per concern.'],
+          packages: [{ name: 'core', use: 'The framework' }],
+        },
+      }),
+    );
+    writeText(
+      join(dir, 'skills', 'stack-dev', 'SKILL.md'),
+      '---\nname: stack-dev\ndescription: Route a ticket.\n---\n\n# Router\n',
+    );
+    writeText(
+      join(dir, 'skills', 'stack-storage', 'SKILL.md'),
+      [
+        '---',
+        'name: stack-storage',
+        'description: Local storage with {{database.label}}.',
+        '---',
+        '',
+        '# Storage',
+        '',
+        'Open the {{database.store}} once.',
+        '',
+        '<!-- swarm:if database=drift -->',
+        'Every schema change needs a migration.',
+        '<!-- swarm:else -->',
+        'Pick a database first.',
+        '<!-- swarm:endif -->',
+        '',
+        'Secrets go to secure storage<!-- swarm:if database!=none -->, rows to the {{database.store}}<!-- swarm:endif -->.',
+        '',
+      ].join('\n'),
+    );
+    writeText(
+      join(dir, 'skills', 'stack-push', 'SKILL.md'),
+      '---\nname: stack-push\ndescription: Push over {{push.source}}.\n---\n\n# Push\n',
+    );
+    writeText(
+      join(dir, 'rules', 'storage.md'),
+      '---\nif: database!=none\npaths: ["src/storage/**"]\ndescription: Storage invariants.\n---\n\n- Use the {{database.store}}.\n',
+    );
+    return dir;
+  };
+
+  const dir = optionPack(join(tempRepo(), 'option-pack'));
+
+  it('evaluates equality, negation, alternatives and conjunction', () => {
+    const answers = { database: 'drift', push: 'none' };
+    assert.equal(matches(undefined, answers), true);
+    assert.equal(matches('database=drift', answers), true);
+    assert.equal(matches('database=hive,drift', answers), true);
+    assert.equal(matches('database!=none', answers), true);
+    assert.equal(matches('push!=none', answers), false);
+    assert.equal(matches('database!=none && push!=none', answers), false);
+    assert.equal(matches('database!=none || push!=none', answers), true);
+    // An option the pack never declared cannot be what removes a skill.
+    assert.equal(matches('analytics=firebase', answers), true);
+  });
+
+  it('keeps an unresolved interpolation visible instead of blanking it', () => {
+    const rendered = renderText('Open the {{database.store}}.', {}, {});
+    assert.equal(rendered, 'Open the {{database.store}}.');
+    assert.deepEqual(unresolvedVars(rendered), ['database.store']);
+  });
+
+  it('resolves blocks, else branches and inline spans', () => {
+    const body = [
+      '<!-- swarm:if database=drift -->',
+      'migration',
+      '<!-- swarm:else -->',
+      'pick one',
+      '<!-- swarm:endif -->',
+      'secrets<!-- swarm:if database!=none -->, rows<!-- swarm:endif -->.',
+    ].join('\n');
+
+    const drift = renderText(body, { database: 'drift' }, {});
+    assert.match(drift, /migration/);
+    assert.ok(!drift.includes('pick one'));
+    assert.match(drift, /secrets, rows\./);
+    assert.deepEqual(unresolvedMarkers(drift), []);
+
+    const none = renderText(body, { database: 'none' }, {});
+    assert.match(none, /pick one/);
+    assert.ok(!none.includes('migration'));
+    assert.match(none, /secrets\./);
+  });
+
+  it('shows a conditional inside fenced code instead of running it, but still interpolates', () => {
+    const doc = [
+      'Before.',
+      '```markdown',
+      '<!-- swarm:if database=drift -->',
+      'a sample the pack is documenting',
+      '<!-- swarm:endif -->',
+      '```',
+      '<!-- swarm:if database=drift -->',
+      'real prose',
+      '<!-- swarm:endif -->',
+      '```dart',
+      'final store = {{database.store}};',
+      '```',
+    ].join('\n');
+
+    const rendered = renderText(doc, { database: 'drift' }, { 'database.store': 'database' });
+    assert.match(rendered, /<!-- swarm:if database=drift -->\na sample the pack is documenting/);
+    assert.match(rendered, /^real prose$/m);
+    assert.match(rendered, /final store = database;/);
+    // A sample is not an unclosed conditional.
+    assert.deepEqual(unresolvedMarkers(rendered), []);
+  });
+
+  it('installs only the skills, rules and checks the answers select', () => {
+    const chosen = loadPacks(process.cwd(), [dir], { stack: { database: 'drift', push: 'none' } });
+    const names = chosen.skills.map((skill) => skill.name);
+    assert.ok(names.includes('stack-storage'));
+    assert.ok(!names.includes('stack-push'), 'a skill an answer ruled out is not installed at all');
+    assert.deepEqual(chosen.rules.filter((rule) => rule.pack === 'stack').map((rule) => rule.file), ['storage.md']);
+    assert.deepEqual(chosen.packs[1].checks.map((check) => check.name), ['generate']);
+
+    const defaults = loadPacks(process.cwd(), [dir]);
+    const byDefault = defaults.skills.map((skill) => skill.name);
+    assert.ok(byDefault.includes('stack-push'), 'the declared default applies when nothing is recorded');
+    assert.ok(!byDefault.includes('stack-storage'));
+    assert.deepEqual(defaults.packs[1].checks, []);
+  });
+
+  it('resolves a description and a body against the answers', () => {
+    const chosen = loadPacks(process.cwd(), [dir], { stack: { database: 'drift' } });
+    const storage = chosen.skills.find((skill) => skill.name === 'stack-storage');
+    assert.equal(storage.description, 'Local storage with Drift.');
+
+    const body = readPackFile(storage, join(storage.dir, 'SKILL.md'));
+    assert.match(body, /Open the database once\./);
+    assert.match(body, /Every schema change needs a migration\./);
+    assert.match(body, /Secrets go to secure storage, rows to the database\./);
+    assert.deepEqual(unresolvedVars(body), []);
+  });
+
+  it('falls back to the default when a recorded answer is no longer offered', () => {
+    const pack = loadPacks(process.cwd(), [dir], { stack: { database: 'mongo' } }).packs[1];
+    assert.equal(pack.selections.database, 'none');
+    assert.deepEqual(unknownSelections(pack.options, { database: 'mongo', colour: 'red' }), [
+      'colour (no such option)',
+      'database=mongo (choices: none, drift)',
+    ]);
+  });
+
+  it('joins the declared packages with the ones the answers brought in', () => {
+    const pack = loadPacks(process.cwd(), [dir], { stack: { database: 'drift' } }).packs[1];
+    assert.deepEqual(pack.stack.packages.map((entry) => entry.name), ['core', 'drift']);
+  });
+
+  it('writes the chosen slots, libraries and layout into the always-loaded block', () => {
+    const packs = loadPacks(process.cwd(), [dir], { stack: { database: 'drift', push: 'none' } });
+    const block = renderMemoryBlock(
+      { config: parseConfig('project: Demo'), packs, root: '.', workflow: new Map(), skills: packs.skills, rules: packs.rules, version: '0' },
+      '.claude/workflow',
+    );
+    assert.match(block, /## Stack/);
+    assert.match(block, /\| Local database \| Drift \|/);
+    assert.match(block, /\| No push \|/);
+    assert.match(block, /`drift` \| Typed SQL/);
+    assert.match(block, /One owner per concern\./);
+  });
+
+  it('round-trips the answers through the config file', () => {
+    const config = { ...parseConfig('project: Demo'), packs: ['stack'], packOptions: { stack: { database: 'drift' } } };
+    const reread = parseConfig(serializeConfig(config));
+    assert.deepEqual(reread.packOptions, { stack: { database: 'drift' } });
+    // A pack with no answers writes no key at all.
+    assert.ok(!serializeConfig({ ...config, packOptions: {} }).includes('packOptions'));
+  });
+
+  it('parses answers given on the command line', () => {
+    assert.deepEqual(parseSelections('database=drift,push=none'), { database: 'drift', push: 'none' });
+    assert.deepEqual(parseSelections(''), {});
+  });
+
+  it('reports an unresolved variable as an error, not a warning', () => {
+    const broken = join(tempRepo(), 'broken');
+    writeText(
+      join(broken, 'collab-swarm-pack.json'),
+      JSON.stringify({ name: 'broken', collabSwarm: 1, skills: [{ name: 'broken-thing', role: 'ticket' }] }),
+    );
+    writeText(
+      join(broken, 'skills', 'broken-thing', 'SKILL.md'),
+      '---\nname: broken-thing\ndescription: A thing.\n---\n\n# Thing\n\nUse the {{nothing.defines.this}}.\n',
+    );
+    const findings = validateRepository(
+      process.cwd(),
+      { ...parseConfig('project: Demo'), plans: join(tempRepo(), 'no-plans') },
+      loadPacks(process.cwd(), [broken]),
+    );
+    assert.ok(findings.errors.some((finding) => finding.message.includes('unresolved pack variable')));
+  });
+});
+
+describe('default packs', () => {
+  it('ships the Flutter pack and resolves it by its bare name', () => {
+    assert.ok(bundledPackNames().includes('flutter'));
+    const flutter = resolvePack('flutter', process.cwd());
+    assert.equal(flutter.bundled, true);
+    assert.deepEqual(flutter.detect, ['pubspec.yaml']);
+    assert.ok(flutter.options.length > 0, 'a default pack asks about the slots a team fills');
+  });
+
+  it('routes every installed concern and installs no skill without a description', () => {
+    const packs = loadPacks(process.cwd(), ['flutter']);
+    const router = packs.skills.find((skill) => skill.name === 'flutter-dev');
+    const routed = readPackFile(router, join(router.dir, 'SKILL.md'));
+
+    for (const skill of packs.skills.filter((entry) => entry.pack === 'flutter')) {
+      assert.notEqual(skill.description, '', `${skill.name} has no description`);
+      if (skill.role !== 'ticket') continue;
+      assert.match(routed, new RegExp(`\`${skill.name}\``), `${skill.name} is installed but unroutable`);
+    }
+  });
+
+  it('publishes no unresolved variable or conditional, whichever answers are given', () => {
+    const combinations = [
+      {},
+      { notifications: 'onesignal', analytics: 'mixpanel', crash: 'sentry', logging: 'talker', database: 'drift', i18n: 'slang', env: 'dart_define' },
+      { notifications: 'none', analytics: 'none', crash: 'none', logging: 'none', database: 'hive', i18n: 'none', env: 'envied' },
+      { database: 'isar', analytics: 'posthog' },
+    ];
+
+    for (const answers of combinations) {
+      const packs = loadPacks(process.cwd(), ['flutter'], { flutter: answers });
+      const files = [
+        ...packs.skills.map((skill) => ({ owner: skill, path: join(skill.dir, 'SKILL.md') })),
+        ...packs.rules.map((rule) => ({ owner: rule, path: rule.path })),
+      ];
+      for (const file of files) {
+        const rendered = readPackFile(file.owner, file.path);
+        assert.deepEqual(unresolvedVars(rendered), [], `${file.path} with ${JSON.stringify(answers)}`);
+        assert.deepEqual(unresolvedMarkers(rendered), [], `${file.path} with ${JSON.stringify(answers)}`);
+      }
+    }
+  });
+
+  it('drops the push and localization concerns when the project uses neither', () => {
+    const bare = loadPacks(process.cwd(), ['flutter'], {
+      flutter: { notifications: 'none', analytics: 'none', crash: 'none', logging: 'none', i18n: 'none' },
+    });
+    const names = bare.skills.map((skill) => skill.name);
+    assert.ok(!names.includes('flutter-push-notifications'));
+    assert.ok(!names.includes('flutter-localization'));
+    assert.ok(!names.includes('flutter-observability'));
+    assert.ok(names.includes('flutter-api-integration'), 'the fixed core is not an option');
+
+    const rules = bare.rules.map((rule) => rule.file);
+    assert.ok(!rules.includes('push-notifications.md'));
+    assert.ok(!rules.includes('observability.md'));
+  });
+
+  it('keeps the observability concern when any one of its three answers is set', () => {
+    const logsOnly = loadPacks(process.cwd(), ['flutter'], {
+      flutter: { analytics: 'none', crash: 'none', logging: 'logger' },
+    });
+    assert.ok(logsOnly.skills.some((skill) => skill.name === 'flutter-observability'));
   });
 });

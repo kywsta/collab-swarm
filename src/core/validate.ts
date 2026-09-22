@@ -2,7 +2,8 @@ import { basename, join, relative } from 'node:path';
 import type { Config } from '../config.js';
 import { CONFIG_FILE, inRoot } from '../config.js';
 import type { PackSet } from '../packs.js';
-import { ticketSkills } from '../packs.js';
+import { readPackFile, ticketSkills } from '../packs.js';
+import { unresolvedMarkers, unresolvedVars } from '../options.js';
 import { exists, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
 import {
@@ -386,6 +387,31 @@ export function validateRepository(
         findings.warn(
           join(skill.dir, 'SKILL.md'),
           `skill "${skill.name}" has no description, which is the line an agent reads to decide whether to open it`,
+        );
+      }
+    }
+
+    // An interpolation nothing answered. The published file carries the braces
+    // verbatim, so an agent reads `{{database.box}}` where an identifier belongs.
+    for (const file of [
+      ...packs.skills.map((skill) => ({ owner: skill, path: join(skill.dir, 'SKILL.md') })),
+      ...packs.rules.map((rule) => ({ owner: rule, path: rule.path })),
+    ]) {
+      const rendered = readPackFile(file.owner, file.path) ?? '';
+      const open = unresolvedVars(rendered);
+      if (open.length > 0) {
+        findings.error(
+          file.path,
+          `${open.length} unresolved pack variable(s): ${open.map((name) => `{{${name}}}`).join(', ')}; ` +
+            'no option answer defines them, so they publish into the agent files as written',
+        );
+      }
+      const markers = unresolvedMarkers(rendered);
+      if (markers.length > 0) {
+        findings.error(
+          file.path,
+          `${markers.length} unclosed pack conditional(s): ${markers.join(', ')}; ` +
+            'the comment publishes into the agent files as written',
         );
       }
     }

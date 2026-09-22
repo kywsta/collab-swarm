@@ -9,9 +9,9 @@ Coordinate one feature through requirements, specification, tickets, implementat
 
 ## 1. Open the plan
 
-Read `collab-swarm.yml` for the plans directory, the sources, and the check commands. Search that directory for the same feature outcome. Resume a matching open plan, including a lone `plan.yml` at stage `requirements` left by `npx swarm claim`. Otherwise create `<plans>/<feature-slug>/` from the shared templates. Use a readable kebab-case slug, not a sequence number.
+Read `collab-swarm.yml` for the plans directory, the sources, and the check commands. Search that directory for the same feature outcome. Resume a matching open plan, including a lone `plan.yml` at stage `requirements` left by `npx collab-swarm claim`. Otherwise create `<plans>/<feature-slug>/` from the shared templates. Use a readable kebab-case slug, not a sequence number.
 
-Run `npx swarm validate` before resuming an existing plan.
+Run `npx collab-swarm validate` before resuming an existing plan.
 
 Done when one package owns the feature and its current stage is known.
 
@@ -48,9 +48,9 @@ Done when every ticket is done or deferred, or a concrete user decision blocks t
 
 ## 5. Review and finish
 
-Set `stage: review`. Run `code-review` over the full diff from `implementation_base_sha`. Then run every skill an installed pack provides whose role is *reviews one surface*, for the surfaces the diff touched — `npx swarm packs` lists them with their roles. Fix every blocking finding and repeat affected checks and reviews.
+Set `stage: review`. Run `code-review` over the full diff from `implementation_base_sha`. Then run every skill an installed pack provides whose role is *reviews one surface*, for the surfaces the diff touched — `npx collab-swarm packs` lists them with their roles. Fix every blocking finding and repeat affected checks and reviews.
 
-Run the full [project checks](../../workflow/WORKFLOW.md#project-checks) with `npx swarm check`. Synchronise affected domain, architecture, routing, and design documentation when the delivered change altered those contracts.
+Run the full [project checks](../../workflow/WORKFLOW.md#project-checks) with `npx collab-swarm check`. Synchronise affected domain, architecture, routing, and design documentation when the delivered change altered those contracts.
 
 Set `stage: complete` and `status: complete`. Report, in [plain names](../../workflow/WORKFLOW.md#plain-names), the delivered behaviour, tests and checks, review outcome, advisory follow-ups, deferred tickets with what each waits for and who owns it, and any merge or deployment action still owned by the user.
 

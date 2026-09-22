@@ -1,4 +1,5 @@
 import { dirname, isAbsolute, join, resolve } from 'node:path';
+import type { Selections } from './options.js';
 import { exists, readText } from './util/fs.js';
 import { CliError } from './util/log.js';
 import { asDict, asString, asStringList, parseYaml, toYaml, type Dict } from './util/yaml.js';
@@ -54,8 +55,15 @@ export interface Config {
   sources: Record<string, SourceConfig>;
   checks: CheckConfig[];
   git: GitConfig;
-  /** Extra skill packs, as npm package names or paths relative to the root. */
+  /** Extra skill packs, as bundled names, npm package names, or paths relative to the root. */
   packs: string[];
+  /**
+   * Answers to the questions a pack asks, keyed by pack name then option id.
+   *
+   * Recorded rather than asked again, so `sync` on a teammate's checkout
+   * produces the same skills, rules and prose without another interview.
+   */
+  packOptions: Record<string, Selections>;
 }
 
 export interface LoadedConfig {
@@ -77,7 +85,25 @@ export const DEFAULT_CONFIG: Config = {
   checks: [],
   git: { remote: 'origin', defaultBranch: 'main', branchPrefix: 'feat/' },
   packs: [],
+  packOptions: {},
 };
+
+function parsePackOptions(raw: unknown): Record<string, Selections> {
+  const dict = asDict(raw);
+  if (!dict) return {};
+  const answers: Record<string, Selections> = {};
+  for (const [pack, value] of Object.entries(dict)) {
+    const entry = asDict(value);
+    if (!entry) continue;
+    const selections: Selections = {};
+    for (const [option, choice] of Object.entries(entry)) {
+      const id = asString(choice);
+      if (id) selections[option] = id;
+    }
+    if (Object.keys(selections).length > 0) answers[pack] = selections;
+  }
+  return answers;
+}
 
 function parseSources(raw: unknown): Record<string, SourceConfig> {
   const dict = asDict(raw);
@@ -139,6 +165,7 @@ export function parseConfig(text: string): Config {
       branchPrefix: asString(git.branchPrefix) ?? DEFAULT_CONFIG.git.branchPrefix,
     },
     packs: asStringList(raw.packs),
+    packOptions: parsePackOptions(raw.packOptions),
   };
 }
 
@@ -171,10 +198,11 @@ export function serializeConfig(config: Config): string {
   }));
   body.git = config.git;
   if (config.packs.length) body.packs = config.packs;
+  if (Object.keys(config.packOptions).length) body.packOptions = config.packOptions;
 
   return [
     '# collab-swarm — how humans and agents deliver features in this repository.',
-    '# Regenerate the agent files after editing: npx swarm sync',
+    '# Regenerate the agent files after editing: npx collab-swarm sync',
     '',
     toYaml(body).trimEnd(),
     '',
@@ -198,7 +226,7 @@ export function loadConfig(from = process.cwd()): LoadedConfig {
     throw new CliError(
       `No ${CONFIG_FILE} found in this directory or any parent.`,
       1,
-      'Run `npx swarm init` in the repository root.',
+      'Run `npx collab-swarm init` in the repository root.',
     );
   }
   const file = join(root, CONFIG_FILE);

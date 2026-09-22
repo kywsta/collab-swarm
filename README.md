@@ -8,7 +8,7 @@ Language and framework agnostic. Framework skills are added as packs.
 
 ```bash
 npm install -D collab-swarm
-npx swarm init
+npx collab-swarm init
 ```
 
 ---
@@ -50,7 +50,7 @@ Two people and four agent sessions on one repository will, by default, plan the 
 - **Blocked is derived, not declared.** A row waiting on an unfinished dependency, an open human gate, or an unanswered product decision is never offered to anyone.
 
 ```console
-$ npx swarm status
+$ npx collab-swarm status
 
 Delivery board · 2026-09-16 · milestone M0 Foundation · 1 done · 1 in progress · 3 available · 1 blocked
 
@@ -63,7 +63,7 @@ Next up
 1. password-recovery — Reset a forgotten PIN by email · M1 Entry · Dev 1 · S · unblocks 0
 2. guest-prices — Show list prices to a signed-out visitor · M1 Entry · Dev 2 · S · rides on the answer to D2 (Should a guest see prices before signing in?)
 3. pin-sign-in — Sign in with a mobile number and PIN · M1 Entry · Dev 1 · M · rides on G2 Customer API contract (decided: mock-first)
-Claim one: npx swarm claim <slug>
+Claim one: npx collab-swarm claim <slug>
 ```
 
 ## Works with the agent you already use
@@ -123,26 +123,28 @@ git: { remote: origin, defaultBranch: main, branchPrefix: "feat/" }
 packs: []
 ```
 
-`init` detects your ecosystem (Node, Python, Go, Rust, Flutter/Dart) and prefills `checks`, and detects common source locations. Edit it, run `npx swarm sync`, and every agent's instructions are regenerated.
+`init` detects your ecosystem (Node, Python, Go, Rust, Flutter/Dart) and prefills `checks`, detects common source locations, and offers the default skill pack that matches your repository. Edit it, run `npx collab-swarm sync`, and every agent's instructions are regenerated.
 
 ## Commands
 
 ```bash
-npx swarm init                    # install into this repository
-npx swarm sync [--check|--force]  # re-apply after an upgrade; --check fails CI when stale
-npx swarm add <pack>              # attach a language or framework skill pack
-npx swarm pack new <name>         # scaffold a pack for this project's own stack
-npx swarm packs                   # what each installed pack contributes
-npx swarm steps [<skill>]         # what each skill does, step by step, and the rules in force
+npx collab-swarm init                    # install into this repository
+npx collab-swarm sync [--check|--force]  # re-apply after an upgrade; --check fails CI when stale
+npx collab-swarm add <pack>              # attach a default pack, an npm package, or a path
+npx collab-swarm pack list               # the default packs shipped with collab-swarm
+npx collab-swarm pack options <pack>     # re-answer what a pack asked, and re-apply it
+npx collab-swarm pack new <name>         # scaffold a pack for this project's own stack
+npx collab-swarm packs                   # what each installed pack contributes
+npx collab-swarm steps [<skill>]         # what each skill does, step by step, and the rules in force
 
-npx swarm status [--lane <lane>]  # the board: done, in progress, available, blocked
-npx swarm next [--lane <lane>]    # the best unclaimed rows, ranked
-npx swarm claim <slug>            # take a row: pushes its branch with a plan skeleton
-npx swarm plan <slug>             # scaffold a plan package by hand
+npx collab-swarm status [--lane <lane>]  # the board: done, in progress, available, blocked
+npx collab-swarm next [--lane <lane>]    # the best unclaimed rows, ranked
+npx collab-swarm claim <slug>            # take a row: pushes its branch with a plan skeleton
+npx collab-swarm plan <slug>             # scaffold a plan package by hand
 
-npx swarm validate                # the workflow contract and every plan
-npx swarm check [--focus <path>]  # your configured checks, in order
-npx swarm doctor                  # what is installed, stale, or missing
+npx collab-swarm validate                # the workflow contract and every plan
+npx collab-swarm check [--focus <path>]  # your configured checks, in order
+npx collab-swarm doctor                  # what is installed, stale, or missing
 ```
 
 `status`, `next`, `packs`, `steps` and `validate` accept `--json`.
@@ -170,11 +172,34 @@ Proposals are ranked by earliest milestone, then the asker's lane, then how many
 
 ## Skill packs
 
-The core workflow knows nothing about your stack. A pack adds what does: concern skills, path-scoped rules, and suggested checks.
+The core workflow knows nothing about your stack. A pack adds what does: concern skills, path-scoped rules, the architecture they assume, and suggested checks.
+
+Some ship inside collab-swarm. `init` offers the one that matches your repository, or add it later:
+
+```bash
+npx collab-swarm pack list      # what ships with this version
+npx collab-swarm add flutter    # nothing to install; it is already here
+```
+
+A pack asks about the slots every team fills differently, and installs itself around your answers:
+
+```console
+$ npx collab-swarm add flutter
+
+Push notifications
+  • 1. Firebase Cloud Messaging · firebase_messaging + flutter_local_notifications
+  ◦ 2. OneSignal · onesignal_flutter, FCM and APNs behind one dashboard
+  ◦ 3. No push notifications · the push skill and its rule are not installed
+A number, or Enter for 1. Firebase Cloud Messaging: 2
+```
+
+Answers are recorded in `collab-swarm.yml`, so a teammate's `npx collab-swarm sync` reproduces the same files without being asked anything. Change one later with `npx collab-swarm pack options flutter`; a skill your new answer rules out is removed from every target rather than left behind.
+
+Anything else is an npm package or a directory:
 
 ```bash
 npm install -D collab-swarm-pack-go
-npx swarm add collab-swarm-pack-go
+npx collab-swarm add collab-swarm-pack-go
 ```
 
 A pack is a directory with a manifest, a `skills/` folder, and optionally `rules/`:
@@ -208,11 +233,13 @@ collab-swarm-pack-go/
 | `review` | `deliver-change`, at feature review |
 | `reference` | being read, when a decision needs its vocabulary |
 
-See [docs/PACKS.md](docs/PACKS.md), and [`examples/pack-example`](examples/pack-example) for a working one.
+A pack may also declare the architecture it installs — the layout, the conventions, and the libraries it is built on. That is rendered into `AGENTS.md` and `CLAUDE.md` beside the chosen integrations, so an agent reads it before deciding which skill to open, and reaches for a library you already have instead of adding one.
+
+See [docs/PACKS.md](docs/PACKS.md) for options, conditions and the stack declaration, and [`examples/pack-example`](examples/pack-example) for a working pack.
 
 ## Skills for your own stack
 
-A published pack only exists for stacks somebody has already packaged. Your project's conventions — the call adapter everything routes through, the base class every handler extends, the wrapper you use instead of raw exceptions — exist in your code and nowhere else.
+A default pack only exists for stacks somebody has already packaged. Your project's conventions — the call adapter everything routes through, the base class every handler extends, the wrapper you use instead of raw exceptions — exist in your code and nowhere else.
 
 Ask your agent for them:
 
@@ -245,14 +272,14 @@ code-review
 
 Tickets name concern skills; nothing names the router or a review skill, because `implement` and `deliver-change` reach those themselves.
 
-Verify what you got with the commands that read it back — `npx swarm packs`, `npx swarm steps <router>`, `npx swarm steps --rules`, `npx swarm validate`. A skill with no description, a rule scoped to nothing, and a step with no completion criterion are each reported.
+Verify what you got with the commands that read it back — `npx collab-swarm packs`, `npx collab-swarm steps <router>`, `npx collab-swarm steps --rules`, `npx collab-swarm validate`. A skill with no description, a rule scoped to nothing, and a step with no completion criterion are each reported.
 
 ## Seeing what an agent will do
 
 The skills *are* the agent's instructions, so `steps` reads them back as an execution map: the sequence each one runs, what finishes each step, which skill it hands work to, and which rules are in force while it runs.
 
 ```console
-$ npx swarm steps deliver-change
+$ npx collab-swarm steps deliver-change
 
 Deliver Feature · deliver-change · coordinates a feature · core
 
@@ -260,7 +287,7 @@ Steps
   1. Open the plan
        files collab-swarm.yml · .docs/changes/<feature>/plan.yml
        rules feature-plans.md → .docs/changes/<feature>/plan.yml
-       runs  npx swarm validate
+       runs  npx collab-swarm validate
        done  one package owns the feature and its current stage is known
   2. Build the complete plan
        calls to-requirements → to-spec → to-tickets
@@ -284,7 +311,7 @@ Nothing is recorded to produce any of this. The map is read from the payload in 
 - a file an **older version wrote** that is no longer emitted — removed, along with any directory it emptied;
 - everything else — rewritten.
 
-Add `npx swarm sync --check` and `npx swarm validate` to CI to catch a stale or invalid checkout.
+Add `npx collab-swarm sync --check` and `npx collab-swarm validate` to CI to catch a stale or invalid checkout.
 
 ## Programmatic use
 

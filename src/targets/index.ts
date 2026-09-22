@@ -1,4 +1,4 @@
-import { readTextOrNull } from '../util/fs.js';
+import { readPackFile } from '../packs.js';
 import { CliError } from '../util/log.js';
 import { readFrontMatter, toYaml } from '../util/yaml.js';
 import { renderMemoryBlock } from './memory.js';
@@ -59,7 +59,7 @@ export function renderRules(
 ): Map<string, string> {
   const rendered = new Map<string, string>();
   for (const rule of context.rules) {
-    const text = readTextOrNull(rule.path) ?? '';
+    const text = readPackFile(rule, rule.path) ?? '';
     const front = readFrontMatter(text);
     const body = repointWorkflowLinks(front ? front.body : text, ruleDir, payloadRoot);
     const name = dialect === 'cursor' ? rule.file.replace(/\.md$/, '.mdc') : rule.file;
@@ -74,7 +74,8 @@ const claudeSettings = (context: EmitContext) =>
       $schema: 'https://json.schemastore.org/claude-code-settings.json',
       permissions: {
         allow: [
-          'Bash(npx swarm:*)',
+          'Bash(npx collab-swarm:*)',
+          'Bash(collab-swarm:*)',
           'Bash(swarm:*)',
           'Bash(git status:*)',
           'Bash(git diff:*)',
