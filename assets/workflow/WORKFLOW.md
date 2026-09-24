@@ -6,6 +6,12 @@ This is the shared contract for planning and implementing one feature. It keeps 
 
 It is deliberately language and framework agnostic. What the project uses, where its truth lives, and which commands verify a change all come from `collab-swarm.yml` and from the skill packs installed alongside this file.
 
+## Where features come from
+
+The backlog is one Markdown file — `backlog:` in `collab-swarm.yml` — holding the milestones, the feature register, the human gates and the decisions register. It is the swarm's queue: a row is claimed by a branch, done when its plan is complete on the default branch, and never offered while a dependency, an open gate or an unanswered decision stands in its way. `to-backlog` writes and reorders it from the project's sources, ordered by dependency and cut so every lane has work; `whats-next` reads it.
+
+A row is planned from the [sources](#sources-of-truth), so a capability no source describes is shaped before it is registered: `new-feature` researches what exists, interviews until the behaviour is settled, writes the product, design and API documents, and hands the rows to `to-backlog`. A change to behaviour a source already describes skips that and goes straight to a plan.
+
 ## Package
 
 One feature plan lives at `<plans>/<feature-slug>/`, where `<plans>` is the `plans:` directory in `collab-swarm.yml` (`.docs/changes` by default):
@@ -61,9 +67,13 @@ A source is cited by path and heading, never summarised from memory. For each so
 
 - **product** — the behaviour the feature must have, and how it will be judged. Cite the file and heading.
 - **design** — which screens or components a surface must match. An index is a map to the design tool, not a substitute for the design: open the linked node during implementation or review when visual or interaction detail matters.
-- **api** — the operations, payloads and error cases the feature may use. Cite each required operation and where it came from, whether a local contract file or a connected server.
+- **api** — the operations, payloads and error cases the feature works with. Cite each one and where it came from, whether a local contract file or a connected server.
 - **domain** — the words to use in code, tests and plans. Add a term before inventing one.
 - **decisions** — open product questions and the working assumptions standing behind them.
+
+A project declares the kinds it has, and a kind with no counterpart here is omitted rather than stubbed. A service that renders nothing declares no design source and lists the operations and events it exposes as its interfaces; an app that calls a contract it does not define declares `api` and never edits it.
+
+**Read or owned.** `owned: true` marks a contract this repository *defines*: a feature extends it as part of delivery, and an operation or surface it lacks is the work itself, added here and cited by everything downstream. Every other source is *read*: the contract is taken as given, and something the feature needs but the contract lacks is a gate — planned around with a stand-in and one deferred ticket, never invented. The same `api:` source therefore means opposite things to the service that defines it and the app that calls it, and this flag is what tells them apart. It belongs on a contract a feature reads or extends; the project's own registers — the product documents, the vocabulary, the decisions — are written here whoever else reads them, so they carry no flag, and `validate` reports one that does.
 
 A source marked `required: true` must be read before planning proceeds. A project that declares no sources plans from the user's request and the code already present, and says so.
 

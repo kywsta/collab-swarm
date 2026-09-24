@@ -35,6 +35,8 @@ And the skills that produce and consume them, in the place each of your agents a
 
 | Say to your agent | What happens |
 | --- | --- |
+| *"We need customers to be able to gift a voucher"* | Researches what exists, interviews you until the behaviour is settled, writes the product, design and API documents, and puts the feature on the board |
+| *"Turn these PRDs into a delivery plan"* | Writes the milestones, the feature register, the human gates and the open decisions — ordered by dependency, cut so every lane has work on day one |
 | *"What's next?"* | Reads the board, proposes the best unclaimed features, claims the one you pick |
 | *"Make a plan to implement password recovery"* | Grounds it in your sources, designs it against your codebase, splits it into vertical tickets — then stops for your review |
 | *"Implement the plan"* | Runs tickets in dependency order, test-first, verifying each with your checks, then reviews the whole diff |
@@ -125,6 +127,34 @@ packs: []
 
 `init` detects your ecosystem (Node, Python, Go, Rust, Flutter/Dart) and prefills `checks`, detects common source locations, and offers the default skill pack that matches your repository. Edit it, run `npx collab-swarm sync`, and every agent's instructions are regenerated.
 
+### Frontend, backend, or both
+
+`sources:` is where a project says what kind of thing it is. A kind it has no counterpart for is left out, not stubbed — and the one distinction that matters is whether a contract is **read** here or **owned** here.
+
+An app owns its screens and reads a contract somebody else serves:
+
+```yaml
+sources:
+  design:
+    label: Figma index
+    paths: ["docs/ui-nodes.md"]
+  api:
+    label: OpenAPI contract
+    paths: ["docs/openapi.yaml"]     # read: an operation it lacks is a gate, built against a stand-in
+```
+
+A service declares no design source at all, and owns the contract instead:
+
+```yaml
+sources:
+  api:
+    label: OpenAPI contract
+    paths: ["openapi.yaml"]
+    owned: true                      # an operation it lacks is this feature's work, delivered with it
+```
+
+`owned: true` is what stops a service filing its own endpoint as a gate and waiting for itself: a gap in a contract you define is a ticket, a gap in one you consume is a gate with an owner, a stand-in, and one deferred ticket for the real connection. A service's interfaces are its operations and events, listed where an app lists its screens. A monorepo that owns both sides simply marks both.
+
 ## Commands
 
 ```bash
@@ -151,7 +181,7 @@ npx collab-swarm doctor                  # what is installed, stale, or missing
 
 ## The backlog
 
-A Markdown file your team edits. Columns are matched **by header name**, so name and order them however you like; only `Slug` and `Title` are required.
+A Markdown file your team edits — or asks an agent to write from your product documents (`to-backlog`). Columns are matched **by header name**, so name and order them however you like; only `Slug` and `Title` are required.
 
 ```markdown
 ### M1 · Entry
@@ -169,6 +199,8 @@ A Markdown file your team edits. Columns are matched **by header name**, so name
 - **`D<n>`** — a product decision, freed by an answer *or* by a recorded working assumption, so planning is never held hostage to a slow reply.
 
 Proposals are ranked by earliest milestone, then the asker's lane, then how many rows the work unblocks, then size.
+
+A capability none of your documents describes yet does not get a row invented for it. `new-feature` shapes it first — what exists today, what the user actually means, what the states and boundaries are — writes that into your product, design and API documents, and only then registers the rows that deliver it. A change to behaviour a document already describes skips all of that and goes straight to a plan.
 
 ## Skill packs
 

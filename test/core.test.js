@@ -301,6 +301,18 @@ git: { remote: upstream, defaultBranch: trunk, branchPrefix: "feature/" }
     assert.deepEqual(parseConfig(serializeConfig(config)), config);
   });
 
+  it('carries `owned` on a contract this repository defines', () => {
+    const config = parseConfig(`version: 1
+sources:
+  api: { label: OpenAPI, paths: ["openapi.yaml"], owned: true }
+  design: { label: Figma, paths: ["docs/ui.md"] }
+`);
+    assert.equal(config.sources.api.owned, true);
+    assert.equal(config.sources.design.owned, undefined);
+    assert.ok(serializeConfig(config).includes('owned: true'));
+    assert.deepEqual(parseConfig(serializeConfig(config)), config);
+  });
+
   it('accepts a single `path` as well as a `paths` list', () => {
     const config = parseConfig('version: 1\nsources:\n  domain: { label: Glossary, path: CONTEXT.md }\n');
     assert.deepEqual(config.sources.domain.paths, ['CONTEXT.md']);
@@ -731,6 +743,24 @@ Recipe: [\`flutter-api-integration\`](../skills/flutter-api-integration/SKILL.md
     const messages = findings.warnings.map((finding) => finding.message);
     assert.ok(messages.some((message) => message.includes('declares no paths')));
     assert.ok(messages.some((message) => message.includes('has no description')));
+  });
+
+  it('reports `owned` on a register this project writes either way', () => {
+    const config = parseConfig(`project: Demo
+sources:
+  product: { label: PRD, paths: ["docs/prd/**/*.md"], owned: true }
+  api: { label: OpenAPI, paths: ["openapi.yaml"], owned: true }
+  events: { label: Event schemas, paths: ["events/**/*.json"], owned: true }
+`);
+    const findings = validateRepository(
+      process.cwd(),
+      { ...config, plans: join(tempRepo(), 'no-plans') },
+      loadPacks(process.cwd(), []),
+    );
+    const owned = findings.warnings.filter((finding) => finding.message.includes('marked `owned`'));
+    // Only the register: a contract kind the project invented keeps both readings.
+    assert.equal(owned.length, 1);
+    assert.ok(owned[0].message.includes('"product"'));
   });
 });
 

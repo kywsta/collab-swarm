@@ -28,6 +28,16 @@ import {
   type Ticket,
 } from './plan.js';
 
+/**
+ * Source kinds this repository writes by definition, whoever else reads them.
+ *
+ * A denylist rather than a list of contract kinds, because `sources:` is open:
+ * a project may declare `events`, `proto` or `schema`, and each of those can
+ * genuinely be owned here or consumed from elsewhere. Only these three have no
+ * second reading to distinguish.
+ */
+const INTERNAL_SOURCES = new Set(['product', 'domain', 'decisions']);
+
 export interface Finding {
   /** Path shown to the user, relative to the repository root. */
   path: string;
@@ -364,6 +374,19 @@ export function validateRepository(
           `required source "${key}" (${source.label}) matches nothing: ${source.paths.join(', ')}`,
         );
       }
+    }
+
+    // `owned` decides whether a gap in a *contract* is this project's work or
+    // somebody else's gate. The project's own registers are written here by
+    // definition, so the flag says nothing there and only misleads a reader.
+    for (const [key, source] of Object.entries(config.sources)) {
+      if (!source.owned || !INTERNAL_SOURCES.has(key)) continue;
+      findings.warn(
+        join(root, CONFIG_FILE),
+        `source "${key}" (${source.label}) is marked \`owned\`, but nothing branches on it: ` +
+          "this project's own register is written here either way. " +
+          'The flag belongs on a contract a feature reads or extends, such as `api`.',
+      );
     }
 
     if (config.backlog && !exists(inRoot(root, config.backlog))) {

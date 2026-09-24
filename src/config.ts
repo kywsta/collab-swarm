@@ -19,6 +19,15 @@ export interface SourceConfig {
   paths: string[];
   /** One line telling the agent what to take from it. */
   use?: string;
+  /**
+   * A contract this repository *defines* rather than consumes.
+   *
+   * The same `api:` source means opposite things on each side of the wire: an
+   * app reads the contract, so an operation it lacks is a gate another team
+   * must close; a service defines it, so the same gap is the work itself. The
+   * flag is what tells a planning agent which reading applies.
+   */
+  owned?: boolean;
   /** A source the agent must consult before planning, when present. */
   required?: boolean;
 }
@@ -121,6 +130,7 @@ function parseSources(raw: unknown): Record<string, SourceConfig> {
       label,
       paths: all,
       ...(asString(entry.use) ? { use: asString(entry.use)! } : {}),
+      ...(entry.owned === true ? { owned: true } : {}),
       ...(entry.required === true ? { required: true } : {}),
     };
   }
@@ -185,6 +195,7 @@ export function serializeConfig(config: Config): string {
         label: source.label,
         paths: source.paths,
         ...(source.use ? { use: source.use } : {}),
+        ...(source.owned ? { owned: true } : {}),
         ...(source.required ? { required: true } : {}),
       },
     ]),

@@ -9,7 +9,11 @@ Coordinate one feature through requirements, specification, tickets, implementat
 
 ## 1. Open the plan
 
-Read `collab-swarm.yml` for the plans directory, the sources, and the check commands. Search that directory for the same feature outcome. Resume a matching open plan, including a lone `plan.yml` at stage `requirements` left by `npx collab-swarm claim`. Otherwise create `<plans>/<feature-slug>/` from the shared templates. Use a readable kebab-case slug, not a sequence number.
+Read `collab-swarm.yml` for the plans directory, the sources, and the check commands. Search that directory for the same feature outcome.
+
+Resume a matching open plan, including a lone `plan.yml` at stage `requirements` left by `npx collab-swarm claim`. Otherwise create `<plans>/<feature-slug>/` from the shared templates. Use a readable kebab-case slug, not a sequence number.
+
+A plan is written from the sources, so a request whose behaviour no source describes goes to `new-feature` first, which interviews the user, writes the product, design and API documents, and registers the feature. A request that changes behaviour a source already describes is planned here.
 
 Run `npx collab-swarm validate` before resuming an existing plan.
 
@@ -40,7 +44,7 @@ Done when either the plan is ready for the user or implementation has a stable r
 
 Select the next ticket whose named dependencies are `done`. Mark it `in-progress`, use `implement`, then mark it `done` only after its behaviour and checks pass.
 
-Mark a ticket `blocked` when it cannot proceed, record the decision it needs under `## Blocked`, and report that decision to the user. Mark it `deferred` with a `## Deferred` section when it waits on an external gate the feature can ship without, such as an API another team owes; deferred tickets do not block review.
+Mark a ticket `blocked` when it cannot proceed, record the decision it needs under `## Blocked`, and report that decision to the user. Mark it `deferred` with a `## Deferred` section when it waits on an external gate the feature can ship without, such as an API another team owes; deferred tickets do not block review. A contract this repository owns (`owned: true`) is never such a gate — the operation it lacks is this feature's work.
 
 Work sequentially in the current checkout by default. Use separate branches or worktrees only when the user or repository policy requests them, or when genuinely independent tickets justify the coordination cost.
 
@@ -50,7 +54,7 @@ Done when every ticket is done or deferred, or a concrete user decision blocks t
 
 Set `stage: review`. Run `code-review` over the full diff from `implementation_base_sha`. Then run every skill an installed pack provides whose role is *reviews one surface*, for the surfaces the diff touched — `npx collab-swarm packs` lists them with their roles. Fix every blocking finding and repeat affected checks and reviews.
 
-Run the full [project checks](../../workflow/WORKFLOW.md#project-checks) with `npx collab-swarm check`. Synchronise affected domain, architecture, routing, and design documentation when the delivered change altered those contracts.
+Run the full [project checks](../../workflow/WORKFLOW.md#project-checks) with `npx collab-swarm check`. Synchronise affected domain, architecture, routing, and design documentation when the delivered change altered those contracts. A source marked `owned: true` is part of the deliverable rather than documentation about it: its file carries every operation or surface this feature added before the plan is complete.
 
 Set `stage: complete` and `status: complete`. Report, in [plain names](../../workflow/WORKFLOW.md#plain-names), the delivered behaviour, tests and checks, review outcome, advisory follow-ups, deferred tickets with what each waits for and who owns it, and any merge or deployment action still owned by the user.
 

@@ -13,11 +13,14 @@ Read `collab-swarm.yml` first: `sources:` declares which kinds of truth this pro
 
 - **product** — find the requested feature and cite the file and heading.
 - **design** — search the index for every matching screen, component and node reference. Cite the index path, matching rows, and the references UI work will need. An index is a map, not the design: open the linked node when visual or interaction detail matters and the connector is available, and mark detail unverified when it is not.
-- **api** — inspect the required operations in the contract file, or in the connected server when the contract is exposed that way. List each operation and where it came from.
+- **api** — inspect the operations this feature works with, in the contract file or in the connected server when the contract is exposed that way. List each operation and where it came from, marking the ones this feature adds when the source is `owned`.
 - **domain** — use the project's own words in stories, criteria and names. Add a term there before inventing one.
 - **decisions** — check whether an open question already has an answer or a working assumption.
 
-When an operation the feature needs exists in no contract, that is a **gate**, not an open product question: record it under `Constraints and open questions` with the shape the feature will build against, so `to-tickets` can plan the stand-in slice and one deferred connection ticket. It never stops planning.
+When the feature needs an operation no contract offers, `owned:` on that source decides which reading applies:
+
+- **read** (the default) — the contract belongs to someone else, so this is a **gate**, not an open product question: record it under `Constraints and open questions` with the shape the feature will build against, so `to-tickets` can plan the stand-in slice and one deferred connection ticket. It never stops planning.
+- **owned** — this repository defines the contract, so the missing operation *is* the work: record it under data and integrations as an operation this feature defines, with the shape it will have, cited to the contract file it will land in. No gate, no stand-in, no deferred ticket, and nobody to wait for.
 
 A project that declares no sources plans from the user's request and the existing code and tests, and says so in the Sources section.
 
