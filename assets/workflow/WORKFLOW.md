@@ -168,6 +168,14 @@ A plan presentation, before and after:
 
 The names come from the sources themselves: a document's title and headings, the decisions register's question column, the gate tracker's title and owner cells, the milestone headings in the delivery plan, and ticket titles. `npx collab-swarm status` already prints them beside each id. Plan documents keep citing path, heading, and decision id, because they are looked up later; this section governs what is said to the user.
 
+## Session name
+
+A session that has claimed a row is about that feature from then on, and the name it carries in the agent's session list should say so. Sessions opened through `whats-next` otherwise all keep the question that started them — "What's next?", "Find next development task" — and a developer holding six of them cannot tell which one carries the work they want.
+
+Rename on the claim, not before: until a row is claimed the session really is a board reading, and a claim that loses the race renames nothing. Take the name from the claimed row: its title in [plain names](#plain-names), cut to the few words that identify it when the register's title is a whole sentence. "Guest home screen", not "A guest can browse the catalogue before signing in", and not `guest-home`. Add nothing that moves — no stage, no status, no lane, no id — or the name is stale by the next commit.
+
+Do it with whatever the host offers for naming or titling the current session — in the Claude Code desktop app that is `set_session_title` on `self`, and other hosts name theirs differently or have none. Hosts that offer nothing simply skip it: the session name is a convenience for the human's list, it is never what records the claim, and it is never worth asking the user about.
+
 ## Escalation
 
 Stop and ask the user when progress requires new product behaviour, conflicting source resolution, a destructive migration, a new secret or external permission, an unresolved security or privacy decision, or meaningful scope expansion. Make reversible local implementation choices autonomously.

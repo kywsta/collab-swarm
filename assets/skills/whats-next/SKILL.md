@@ -49,6 +49,6 @@ npx collab-swarm claim <slug>
 
 The tool re-fetches, refuses a row that is claimed, done, blocked, or unknown (relay its reason and offer the next proposal), creates the claim branch from the default branch, commits the plan skeleton at stage `requirements`, and pushes. A rejected push means another developer won the race: the tool restores the checkout and names the winner.
 
-On success the checkout is on the claim branch. Hand off to `deliver-change` with the feature's title and the sources cell from its register row; it resumes the plan the claim created. Start `deliver-change` in the same turn when the user asked to begin work, not only to claim.
+On success the checkout is on the claim branch, and this session now belongs to that one feature: give it the row's [session name](../../workflow/WORKFLOW.md#session-name) using whatever the host offers for titling the current session, and move on without comment whether it worked or the host has no such control. Hand off to `deliver-change` with the feature's title and the sources cell from its register row; it resumes the plan the claim created. Start `deliver-change` in the same turn when the user asked to begin work, not only to claim.
 
 Done is automatic: merging the pull request puts the complete plan on the default branch, and the next fetch shows the row as done.
