@@ -9,7 +9,11 @@ Coordinate one feature through requirements, specification, tickets, implementat
 
 ## 1. Open the plan
 
-Read `collab-swarm.yml` for the plans directory, the sources, and the check commands. Search that directory for the same feature outcome. Resume a matching open plan, including a lone `plan.yml` at stage `requirements` left by `npx collab-swarm claim`. Otherwise create `<plans>/<feature-slug>/` from the shared templates. Use a readable kebab-case slug, not a sequence number.
+Read `collab-swarm.yml` for the plans directory, the sources, and the check commands. Search that directory for the same feature outcome.
+
+Resume a matching open plan, including a lone `plan.yml` at stage `requirements` left by `npx collab-swarm claim`. Otherwise create `<plans>/<feature-slug>/` from the shared templates. Use a readable kebab-case slug, not a sequence number.
+
+A plan is written from the sources, so a request whose behaviour no source describes goes to `new-feature` first, which interviews the user, writes the product, design and API documents, and registers the feature. A request that changes behaviour a source already describes is planned here.
 
 Run `npx collab-swarm validate` before resuming an existing plan.
 

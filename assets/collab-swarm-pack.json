@@ -5,6 +5,10 @@
   "collabSwarm": 1,
   "skills": [
     {
+      "name": "new-feature",
+      "role": "coordinator"
+    },
+    {
       "name": "deliver-change",
       "role": "coordinator"
     },
@@ -34,6 +38,10 @@
     },
     {
       "name": "whats-next",
+      "role": "stage"
+    },
+    {
+      "name": "to-backlog",
       "role": "stage"
     },
     {

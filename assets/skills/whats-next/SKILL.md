@@ -24,7 +24,7 @@ Both fetch the remote with prune first; add `--no-fetch` offline. Pass `--lane` 
 
 The tool derives every row's state: **done** (plan complete on the default branch), **in progress** (a claim branch on the remote, with holder and plan stage), **available**, or **blocked** (a dependency not done, a gate whose tracker status is open, or a decision with neither an answer nor a working assumption). Proposals are ranked by earliest milestone, the named lane, most rows unblocked, then size.
 
-Done when the command has run and its output is in hand. If it fails, report the error verbatim; do not reconstruct the board by hand.
+Done when the command has run and its output is in hand. If it fails, report the error verbatim; do not reconstruct the board by hand. When the project has no backlog file yet, or its register holds no rows, say so and offer `to-backlog`, which writes one from the project's sources.
 
 ## 2. Present it
 
