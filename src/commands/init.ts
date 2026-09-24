@@ -72,8 +72,29 @@ const ECOSYSTEMS: { when: string; name: string; checks: CheckConfig[] }[] = [
   },
 ];
 
+/**
+ * Whether a contract source is defined here or consumed from elsewhere.
+ *
+ * The same contract reads in opposite directions on each side of the wire, so
+ * the answer decides whether a gap in it is a gate another team closes or the
+ * work this project is about to do.
+ */
+interface Ownership {
+  question: string;
+  defines: string;
+  consumes: string;
+  /** The `use:` line written when this repository defines it. */
+  use: string;
+}
+
 /** Source suggestions, offered only when the repository already has the files. */
-const SOURCE_CANDIDATES: { key: string; label: string; use: string; globs: string[] }[] = [
+const SOURCE_CANDIDATES: {
+  key: string;
+  label: string;
+  use: string;
+  globs: string[];
+  owns?: Ownership;
+}[] = [
   {
     key: 'product',
     label: 'Product requirements',
@@ -85,12 +106,24 @@ const SOURCE_CANDIDATES: { key: string; label: string; use: string; globs: strin
     label: 'Design index',
     use: 'Which screens and components a surface must match',
     globs: ['docs/design', 'docs/ui', 'design'],
+    owns: {
+      question: 'The design specs: are they defined in this repository, or in a design tool?',
+      defines: 'This repository defines them',
+      consumes: 'They come from a design tool',
+      use: 'The surfaces this project defines, and the states each must render',
+    },
   },
   {
     key: 'api',
     label: 'API contract',
     use: 'The operations, payloads and error cases a feature may use',
     globs: ['openapi.yaml', 'openapi.json', 'docs/api', 'api', 'schema.graphql'],
+    owns: {
+      question: 'The API contract: does this repository define it, or consume one?',
+      defines: 'This repository defines it',
+      consumes: 'It is defined elsewhere and consumed here',
+      use: 'The operations, payloads and error cases this project defines for its consumers',
+    },
   },
   {
     key: 'domain',
@@ -126,6 +159,60 @@ function detectSources(root: string): Record<string, SourceConfig> {
     };
   }
   return sources;
+}
+
+/**
+ * Asks which contracts this repository defines rather than consumes.
+ *
+ * Only contract sources are asked about, and only when the repository has one:
+ * the answer changes what a planning agent does with a gap in that contract, so
+ * leaving it unasked is what sends a service off to wait for its own endpoint.
+ * `--owns api,design` answers it where there is no terminal.
+ */
+async function askOwnership(
+  sources: Record<string, SourceConfig>,
+  args: Args,
+  assumeYes: boolean,
+): Promise<void> {
+  const flagged = flagString(args, 'owns');
+  const named =
+    flagged === null
+      ? null
+      : new Set(
+          flagged
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean),
+        );
+
+  for (const candidate of SOURCE_CANDIDATES) {
+    const source = sources[candidate.key];
+    if (!source || !candidate.owns) continue;
+    const owns = candidate.owns;
+    const owned = named
+      ? named.has(candidate.key)
+      : assumeYes
+        ? false
+        : (await select(
+            `\n${owns.question}`,
+            [
+              {
+                value: 'consumes',
+                label: owns.consumes,
+                hint: '· a gap in it is a gate another team closes',
+              },
+              {
+                value: 'defines',
+                label: owns.defines,
+                hint: "· a gap in it is this project's work",
+              },
+            ],
+            'consumes',
+          )) === 'defines';
+    if (!owned) continue;
+    source.owned = true;
+    source.use = owns.use;
+  }
 }
 
 function detectDefaultBranch(git: Git): string {
@@ -205,6 +292,7 @@ export async function run(args: Args): Promise<number> {
         .map((source) => source.label)
         .join(', ')}. Agents will ground plans in them.`,
     );
+    await askOwnership(sources, args, assumeYes);
   }
 
   const backlogPath = 'docs/delivery-plan.md';

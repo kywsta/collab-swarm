@@ -127,6 +127,34 @@ packs: []
 
 `init` detects your ecosystem (Node, Python, Go, Rust, Flutter/Dart) and prefills `checks`, detects common source locations, and offers the default skill pack that matches your repository. Edit it, run `npx collab-swarm sync`, and every agent's instructions are regenerated.
 
+### Frontend, backend, or both
+
+`sources:` is where a project says what kind of thing it is. A kind it has no counterpart for is left out, not stubbed — and the one distinction that matters is whether a contract is **read** here or **owned** here.
+
+An app owns its screens and reads a contract somebody else serves:
+
+```yaml
+sources:
+  design:
+    label: Figma index
+    paths: ["docs/ui-nodes.md"]
+  api:
+    label: OpenAPI contract
+    paths: ["docs/openapi.yaml"]     # read: an operation it lacks is a gate, built against a stand-in
+```
+
+A service declares no design source at all, and owns the contract instead:
+
+```yaml
+sources:
+  api:
+    label: OpenAPI contract
+    paths: ["openapi.yaml"]
+    owned: true                      # an operation it lacks is this feature's work, delivered with it
+```
+
+`owned: true` is what stops a service filing its own endpoint as a gate and waiting for itself: a gap in a contract you define is a ticket, a gap in one you consume is a gate with an owner, a stand-in, and one deferred ticket for the real connection. A service's interfaces are its operations and events, listed where an app lists its screens. A monorepo that owns both sides simply marks both.
+
 ## Commands
 
 ```bash
