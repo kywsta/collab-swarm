@@ -87,6 +87,7 @@ ${style.bold('Deliver')}
   claim <slug>             Claim a row by pushing its branch with a plan skeleton
   plan <slug> [--title T]  Scaffold a feature plan package locally
   validate [<plan-dir>]    Check the workflow contract and every plan
+  history                  What has been delivered, and what can be compacted
   check [--focus <path>]   Run the project's configured checks
 
 ${style.bold('Options')}
@@ -112,6 +113,8 @@ async function dispatch(args: Args): Promise<number> {
       return (await import('./commands/board.js')).run(args);
     case 'claim':
       return (await import('./commands/claim.js')).run(args);
+    case 'history':
+      return (await import('./commands/history.js')).run(args);
     case 'plan':
       return (await import('./commands/plan.js')).run(args);
     case 'check':

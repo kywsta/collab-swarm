@@ -123,6 +123,10 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
           '`Fix <small thing>` / `Change <small thing>`',
           '`small-change` states a short contract, asks whether to record it, builds it test-first, and reviews it against that contract; anything bigger goes to a plan',
         ],
+        [
+          '`Compact the project history`',
+          '`compact-history` folds finished plans and small changes into `HISTORY.md` beside the plans, promotes what still matters, and retires delivered milestones from the backlog — after the user agrees to the scope',
+        ],
       ],
     ),
   );

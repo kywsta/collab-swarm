@@ -7,7 +7,7 @@ description: Report delivery status and propose the next unclaimed features when
 
 Answer two questions about the delivery plan without the human reading it: **how is it going** and **what should I pick up next**.
 
-The feature register in the project's backlog file is the list of work, and Git is the tracker: a branch named for a row is the **claim** on it, and that row's plan complete on the default branch is **done**. Nothing outside the repository records state, so every developer and every agent sees the same board after one fetch.
+The feature register in the project's backlog file is the list of work, and Git is the tracker: a branch named for a row is the **claim** on it, and that row's plan complete on the default branch — or its row in the delivery history there, once the plan is compacted — is **done**. Nothing outside the repository records state, so every developer and every agent sees the same board after one fetch.
 
 The mechanics live in `npx collab-swarm`; this skill runs them and presents the result. It writes no feature code: a claimed row goes to `deliver-change`.
 
@@ -22,7 +22,7 @@ npx collab-swarm next --lane "Dev 2" # "What's next?" — only the top three, th
 
 Both fetch the remote with prune first; add `--no-fetch` offline. Pass `--lane` when the user names their lane ("I'm Dev 2", "I'm on backend"); otherwise leave it out and each proposal shows its own lane.
 
-The tool derives every row's state: **done** (plan complete on the default branch), **in progress** (a claim branch on the remote, with holder and plan stage), **available**, or **blocked** (a dependency not done, a gate whose tracker status is open, or a decision with neither an answer nor a working assumption). Proposals are ranked by earliest milestone, the named lane, most rows unblocked, then size.
+The tool derives every row's state: **done** (plan complete on the default branch, or compacted into the delivery history), **in progress** (a claim branch on the remote, with holder and plan stage), **available**, or **blocked** (a dependency not done, a gate whose tracker status is open, or a decision with neither an answer nor a working assumption). Proposals are ranked by earliest milestone, the named lane, most rows unblocked, then size.
 
 Done when the command has run and its output is in hand. If it fails, report the error verbatim; do not reconstruct the board by hand. When the project has no backlog file yet, or its register holds no rows, say so and offer `to-backlog`, which writes one from the project's sources.
 

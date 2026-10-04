@@ -42,6 +42,7 @@ And the skills that produce and consume them, in the place each of your agents a
 | *"Implement the plan"* | Runs tickets in dependency order, test-first, verifying each with your checks, then reviews the whole diff |
 | *"Resume the password-recovery plan"* | Picks up from the stage recorded in `plan.yml` |
 | *"Show a zero price as Free"* | Too small to plan: states a short contract, asks whether to record it, builds it test-first, and reviews the diff against that contract — off the board, no plan |
+| *"Compact the project history"* | Folds finished and superseded plans into one short delivery history, promotes what still matters, retires delivered milestones from the backlog — and deletes nothing you have not agreed to |
 
 ## Why a swarm needs this
 
@@ -49,7 +50,7 @@ Two people and four agent sessions on one repository will, by default, plan the 
 
 - **The backlog is a Markdown table** your team already maintains. No external tracker to sync.
 - **A claim is a pushed branch.** Claiming races are resolved by the Git server, atomically. The loser is told who won and offered the next row.
-- **Done is a completed plan on the default branch.** Merging the pull request is what marks a feature done; nothing else to remember.
+- **Done is a completed plan on the default branch.** Merging the pull request is what marks a feature done; nothing else to remember. Compacting the plan later into the delivery history keeps it done.
 - **Blocked is derived, not declared.** A row waiting on an unfinished dependency, an open human gate, or an unanswered product decision is never offered to anyone.
 
 ```console
@@ -174,11 +175,12 @@ npx collab-swarm claim <slug>            # take a row: pushes its branch with a 
 npx collab-swarm plan <slug>             # scaffold a plan package by hand
 
 npx collab-swarm validate                # the workflow contract and every plan
+npx collab-swarm history                 # what has been delivered, and what can be compacted
 npx collab-swarm check [--focus <path>]  # your configured checks, in order
 npx collab-swarm doctor                  # what is installed, stale, or missing
 ```
 
-`status`, `next`, `packs`, `steps` and `validate` accept `--json`.
+`status`, `next`, `history`, `packs`, `steps` and `validate` accept `--json`.
 
 ## The backlog
 
@@ -335,6 +337,40 @@ Steps
 `steps --rules` inverts it — for each rule, every step it governs and the file that brought it into force. That is the shortest path to *why did it do that?*: a rule reaches a step either because the step writes a file inside the rule's globs, or because the rule names the skill as its recipe, and the map says which.
 
 Nothing is recorded to produce any of this. The map is read from the payload in your checkout, so it describes the skills you actually have, including everything your packs added — and the workflow keeps [no event log](assets/workflow/WORKFLOW.md), by design. It tells you what an agent is instructed to do, not what one did.
+
+## Keeping the repository small
+
+Every feature leaves a plan behind, and a plan is only worth reading while its feature is being built. A year in, `.docs/changes/` holds sixty of them: spent tickets, sequencing nobody needs, and requirements for features that were later rebuilt, which still read as true to an agent searching for how something works.
+
+```console
+$ npx collab-swarm history
+
+Delivery history · .docs/changes/HISTORY.md · nothing compacted yet · 41 directories under the plans
+
+Ready to compact · 34 directories, 9,812 lines
+- app-shell — Tab shell · plan · M0 Foundation · last commit 2026-06-02 · 9 files, 388 lines · commit 3f9c2a1b7d4e
+  ...
+Complete, but still owed deferred work — lift it into the backlog first, or keep the plan
+- pin-sign-in — Sign in with a PIN · plan · M1 Entry · ...
+    deferred: Connect the live customer API (connect-live-api)
+
+Backlog
+- Milestone M0 Foundation is fully delivered: 6 rows (app-shell, design-kit, ...)
+- Gate G4 Firebase projects per flavor (Dev 1) is closed, and nothing unfinished names it
+```
+
+Ask your agent to *"compact the project history"*. The `compact-history` skill judges what the command cannot: which plans a later one superseded, which specification decisions still constrain the code (they go to your architecture decisions), which product facts no source holds yet, and which deferred tickets must become backlog rows rather than vanish. It proposes all of it in one message, and acts only on what you agree to.
+
+The result is one file beside the plans, a row per compacted directory with the commit that still holds it:
+
+```markdown
+| Slug | Title | Status | Completed | Commit | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `app-shell` | Tab shell | delivered | 2026-06-02 | 3f9c2a1b7d4e | |
+| `guest-home` | Browse before signing in | superseded | 2026-07-12 | 81d0e6c2a9f3 | Replaced by `guest-home-v2`. |
+```
+
+Nothing is lost: `git show 3f9c2a1b7d4e:.docs/changes/app-shell/specification.md` reads any of it back. And nothing on the board moves: a delivered row in the history is done, exactly as a complete plan was, so everything waiting on it stays unblocked after its directory is gone.
 
 ## Upgrading
 

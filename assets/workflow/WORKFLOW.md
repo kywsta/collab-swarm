@@ -8,7 +8,7 @@ It is deliberately language and framework agnostic. What the project uses, where
 
 ## Where features come from
 
-The backlog is one Markdown file — `backlog:` in `collab-swarm.yml` — holding the milestones, the feature register, the human gates and the decisions register. It is the swarm's queue: a row is claimed by a branch, done when its plan is complete on the default branch, and never offered while a dependency, an open gate or an unanswered decision stands in its way. `to-backlog` writes and reorders it from the project's sources, ordered by dependency and cut so every lane has work; `whats-next` reads it.
+The backlog is one Markdown file — `backlog:` in `collab-swarm.yml` — holding the milestones, the feature register, the human gates and the decisions register. It is the swarm's queue: a row is claimed by a branch, done when its plan is complete on the default branch — or, once compacted, listed as delivered in the [history](#compacting-history) there — and never offered while a dependency, an open gate or an unanswered decision stands in its way. `to-backlog` writes and reorders it from the project's sources, ordered by dependency and cut so every lane has work; `whats-next` reads it.
 
 A row is planned from the [sources](#sources-of-truth), so a capability no source describes is shaped before it is registered: `new-feature` researches what exists, interviews until the behaviour is settled, writes the product, design and API documents, and hands the rows to `to-backlog`. A change to behaviour a source already describes skips that and goes straight to a plan.
 
@@ -159,6 +159,23 @@ Blocking findings are correctness, security, privacy, data-loss, architecture, a
 
 Completion requires every ticket done or deferred, no blocking review finding, generated sources current, and the full check set passing. Update the domain vocabulary, architecture decisions, routing instructions, or design system when the delivered change alters those contracts.
 
+## Compacting history
+
+Plans are written to be read while a feature is being built. Once it ships, its tickets are spent, its sequencing is spent, and its requirements describe the behaviour as it was on the day it merged. A year of them buries the plans still in flight, and an agent that searches `<plans>/` finds requirements the code has since outgrown — the worst of them belonging to features that were later replaced.
+
+`compact-history` turns that pile into one short file, `<plans>/HISTORY.md`: a row per compacted plan or recorded small change, with what it delivered and the commit that still holds every file of it. Then the directories are deleted. Nothing is lost — Git holds them — but nothing finished stays where live work is looked for.
+
+What compacting may touch, and what it never does:
+
+- **Only what Git can give back.** A directory is compacted only when it is complete and the default branch holds it exactly as it is; the history names that commit, and `npx collab-swarm history` reports a row whose commit does not hold its plan.
+- **Done survives.** The board reads `delivered` and `superseded` rows as done, so a backlog row that depends on a compacted feature stays unblocked.
+- **Owed work is lifted, not buried.** A complete plan still holding a deferred ticket keeps its directory until that ticket is moved into the backlog as a row of its own, with the gate it waits for.
+- **What lasts is promoted first.** A specification decision that still constrains the code goes to the architecture decisions, and a product fact no source holds goes to the product source the project owns. The history notes where each went; it does not become their home.
+- **The backlog keeps what the board needs.** A milestone whose every row is delivered collapses into its history section; a gate no longer open and an answered question are retired only when nothing unfinished names them. Live rows, gates and questions are never touched.
+- **The user chooses.** What was superseded, what was dropped, and whether a document outside the plans is still wanted are the user's calls, asked once in one batch, and nothing is deleted before the answer.
+
+Compact on its own branch, named outside the claim prefix, and merge it like any other change. Run `npx collab-swarm history` to see whether there is anything to compact; there is no schedule, and a project of a dozen plans needs none.
+
 ## Plain names
 
 Everything said to the user in conversation — a plan presentation, the delivery board, a ticket handback, a review, or a completion report — is written for someone who has never opened the registers. The registers key their rows with short ids: document numbers, decisions such as `D6`, gates such as `G2`, milestones such as `M6`. Inside a document those keys are citations a reader can follow; in conversation they are noise. Speak in **plain names**: say what the row is about, and let the key trail once in parentheses as the handle for finding it. The check is to delete every id from the sentence: it must still tell the reader what is meant.
@@ -194,4 +211,4 @@ Stop and ask the user when progress requires new product behaviour, conflicting 
 
 ## Validation
 
-Run `npx collab-swarm validate` after creating or changing a plan and before reporting completion. Validation checks package shape, required sections, ticket dependencies, statuses, and skill names. It deliberately does not recreate human traceability or evidence bureaucracy: no approval hashes, revision copies, event logs, attempt leases, traceability matrices, or evidence directories.
+Run `npx collab-swarm validate` after creating or changing a plan and before reporting completion. Validation checks package shape, required sections, ticket dependencies, statuses, and skill names. It also checks the delivery history: every row has a slug, a known status and a commit, and no slug is both compacted and live. It deliberately does not recreate human traceability or evidence bureaucracy: no approval hashes, revision copies, event logs, attempt leases, traceability matrices, or evidence directories.

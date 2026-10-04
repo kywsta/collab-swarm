@@ -2,12 +2,17 @@ import { flagBool, flagString, type Args } from '../cli.js';
 import { inRoot, loadConfig, type Config } from '../config.js';
 import { Board, normalizeLane } from '../core/board.js';
 import { Claims } from '../core/claims.js';
+import { historyPath } from '../core/history.js';
 import { Register } from '../core/register.js';
 import { renderNext, renderStatus } from '../core/render.js';
 import { readTextOrNull } from '../util/fs.js';
 import { CliError, out } from '../util/log.js';
 
-/** Loads the register from the configured backlog, plus a decisions source when declared. */
+/**
+ * Loads the register from the configured backlog, plus a decisions source when
+ * declared, plus the questions the delivery history records as settled — a
+ * question retired from the backlog stays answered for any row still citing it.
+ */
 export function loadRegister(root: string, config: Config): Register {
   if (!config.backlog) return Register.empty();
   const backlog = readTextOrNull(inRoot(root, config.backlog));
@@ -24,7 +29,8 @@ export function loadRegister(root: string, config: Config): Register {
         .map((path) => readTextOrNull(inRoot(root, path)))
         .find((text) => text !== null) ?? '')
     : '';
-  return Register.parse(backlog, decisions);
+  const history = readTextOrNull(inRoot(root, historyPath(config.plans))) ?? '';
+  return Register.parse(backlog, `${decisions}\n\n${history}`);
 }
 
 export function buildBoard(root: string, config: Config, options: { fetch?: boolean } = {}): Board {

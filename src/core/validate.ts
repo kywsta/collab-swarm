@@ -6,6 +6,7 @@ import { readPackFile, ticketSkills } from '../packs.js';
 import { unresolvedMarkers, unresolvedVars } from '../options.js';
 import { exists, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
+import { historyFindings, historyPath } from './history.js';
 import {
   CHANGE_SECTIONS,
   CHANGE_STATUSES,
@@ -489,6 +490,12 @@ export function validateRepository(
   const plansRoot = inRoot(root, config.plans);
   for (const dir of listPlanDirs(plansRoot)) {
     validatePlan(join(plansRoot, dir), packs, findings);
+  }
+
+  const history = inRoot(root, historyPath(config.plans));
+  for (const finding of historyFindings(root, config)) {
+    if (finding.severity === 'error') findings.error(history, finding.message);
+    else findings.warn(history, finding.message);
   }
   return findings;
 }

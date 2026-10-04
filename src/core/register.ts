@@ -46,15 +46,15 @@ const MILESTONE_HEADING = /^#{2,4}\s+(M\d+)\b\s*(?:[·:—-]\s*)?(.*?)\s*(?:\([^
 const BACKTICKED = /`([a-z0-9]+(?:-[a-z0-9]+)*)`/g;
 const GATE_ID = /\bG\d+\b/g;
 const DECISION_ID = /\bD\d+\b/g;
-const SEPARATOR_ROW = /^\|[\s:|-]+\|$/;
+export const SEPARATOR_ROW = /^\|[\s:|-]+\|$/;
 
-const cells = (line: string): string[] => {
+export const cells = (line: string): string[] => {
   const trimmed = line.trim();
   const inner = trimmed.slice(1, trimmed.endsWith('|') ? -1 : undefined);
   return inner.split('|').map((cell) => cell.trim());
 };
 
-const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+export const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 /** Header aliases, so a team may name a column the way it already does. */
 const COLUMNS: Record<keyof Omit<RegisterRow, 'gates' | 'decisions' | 'milestone'>, string[]> = {
@@ -311,6 +311,16 @@ export class Register {
 
   decision(id: string): Decision | undefined {
     return this.decisions.get(id);
+  }
+
+  /** Every gate in the tracker, in the order it lists them. */
+  listGates(): Gate[] {
+    return [...this.gates.values()];
+  }
+
+  /** Every decision either register holds. */
+  listDecisions(): Decision[] {
+    return [...this.decisions.values()];
   }
 
   milestoneName(id: string): string | undefined {
