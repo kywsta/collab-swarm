@@ -13,6 +13,10 @@
       "role": "coordinator"
     },
     {
+      "name": "small-change",
+      "role": "coordinator"
+    },
+    {
       "name": "to-requirements",
       "role": "stage"
     },

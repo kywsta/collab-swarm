@@ -2,7 +2,7 @@
 paths:
   - ".docs/changes/**"
   - "docs/changes/**"
-description: Invariants for feature plan documents — plan.yml, requirements, specification and tickets.
+description: Invariants for feature plan documents — plan.yml, requirements, specification and tickets — and for recorded small changes.
 ---
 
 # Feature plan rule
@@ -16,4 +16,5 @@ Full contract: [the workflow](../workflow/WORKFLOW.md) and [artifact formats](..
 - A ticket's front matter carries only `title`, `status`, `depends_on`, and `skills`; `skills` names only ticket-role skills, which `npx collab-swarm packs` lists.
 - Dependencies name other ticket slugs, form no cycle, and a ticket becomes active only once they are `done`.
 - A `deferred` ticket names what it waits for under `## Deferred`; a `blocked` ticket names the decision it needs under `## Blocked`.
+- A recorded small change is a lone `change.md`, owned by `small-change`: front matter `title`, `status` (`in-progress` or `complete`), and `base_sha`; sections `What changes`, `Why`, `Acceptance criteria`, `Out of scope`, `Tests`. Never beside a `plan.yml`.
 - Run `npx collab-swarm validate` after changing any of these files.

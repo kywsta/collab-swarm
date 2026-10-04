@@ -13,7 +13,7 @@ Read `collab-swarm.yml` for the plans directory, the sources, and the check comm
 
 Resume a matching open plan, including a lone `plan.yml` at stage `requirements` left by `npx collab-swarm claim`. Otherwise create `<plans>/<feature-slug>/` from the shared templates. Use a readable kebab-case slug, not a sequence number.
 
-A plan is written from the sources, so a request whose behaviour no source describes goes to `new-feature` first, which interviews the user, writes the product, design and API documents, and registers the feature. A request that changes behaviour a source already describes is planned here.
+A plan is written from the sources, so a request whose behaviour no source describes goes to `new-feature` first, which interviews the user, writes the product, design and API documents, and registers the feature. A request that changes behaviour a source already describes is planned here. A request that fits one ticket and the user did not ask to plan — a fix, a tweak, a copy or configuration change — goes to `small-change` instead.
 
 Run `npx collab-swarm validate` before resuming an existing plan.
 

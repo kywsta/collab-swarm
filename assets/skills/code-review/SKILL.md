@@ -14,7 +14,7 @@ Both axes run as parallel read-only sub-agents so one concern does not mask the 
 
 ## 1. Fix the diff
 
-For a feature plan, use `implementation_base_sha` from `plan.yml`. In standalone use, use the ref supplied by the user or the feature branch's merge base. Review committed and tracked working-tree changes with `git diff <base>`, list commits with `git log <base>..HEAD --oneline`, and include untracked files reported by `git status --short`.
+For a feature plan, use `implementation_base_sha` from `plan.yml`. For a small change, use `base_sha` from its `change.md`, or the base `small-change` recorded in the conversation. In standalone use, use the ref supplied by the user or the feature branch's merge base. Review committed and tracked working-tree changes with `git diff <base>`, list commits with `git log <base>..HEAD --oneline`, and include untracked files reported by `git status --short`.
 
 Confirm the base resolves and the diff is non-empty.
 
@@ -22,7 +22,7 @@ Done when both reviewers will inspect the same complete diff.
 
 ## 2. Load the feature contract
 
-Use the matching `requirements.md`, `specification.md`, and ticket files. If no feature plan exists, use the issue or specification the user supplied. Skip the Feature axis only when no contract can be found, and state that limitation.
+Use the matching `requirements.md`, `specification.md`, and ticket files. For a small change, use its `change.md`, or the contract the user confirmed in the conversation: its acceptance criteria are the requirements and its out-of-scope list bounds the diff. If neither exists, use the issue or specification the user supplied. Skip the Feature axis only when no contract can be found, and state that limitation.
 
 Done when the requested behaviour and scope are explicit.
 
@@ -51,7 +51,7 @@ Done when both documented rules and relevant design smells are available to the 
 
 The Standards reviewer receives the fixed diff, untracked files, commit list, standards sources, and smell list. It reports every documented-rule violation and relevant smell with file and hunk.
 
-The Feature reviewer receives the same diff plus requirements, specification, and tickets. It reports missing or partial behaviour, work outside scope, incorrect implementation, and missing tests or required states. It cites descriptive headings or criterion names rather than workflow ids.
+The Feature reviewer receives the same diff plus requirements, specification, and tickets — or the small change's contract. It reports missing or partial behaviour, work outside scope, incorrect implementation, and missing tests or required states. It cites descriptive headings or criterion names rather than workflow ids.
 
 Each reviewer proposes `blocking` or `advisory` severity and stays under 400 words.
 

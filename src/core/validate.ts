@@ -7,6 +7,8 @@ import { unresolvedMarkers, unresolvedVars } from '../options.js';
 import { exists, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
 import {
+  CHANGE_SECTIONS,
+  CHANGE_STATUSES,
   PLAN_STAGES,
   PLAN_STATUSES,
   REQUIREMENTS_SECTIONS,
@@ -15,6 +17,7 @@ import {
   TICKET_SECTIONS,
   TICKET_STATUSES,
   WORKFLOW_VERSION,
+  changeFile,
   isSettled,
   listPlanDirs,
   readPlan,
@@ -243,6 +246,40 @@ function checkTicketFrontMatter(ticket: Ticket, allowed: string[], findings: Fin
   }
 }
 
+/**
+ * A recorded small change. It has no stages and no tickets, and it is never a
+ * claim, so only its own shape is checked: who it is, where review starts, and
+ * the contract the review is held to.
+ */
+function validateChange(file: string, packs: PackSet, findings: Findings): void {
+  const text = readTextOrNull(file);
+  if (text === null) return;
+  const front = readFrontMatter(text);
+  if (!front) {
+    findings.error(file, 'YAML front matter is missing or unclosed');
+    return;
+  }
+  const { title, status, base_sha: sha } = front.data;
+  if (typeof title !== 'string' || title.trim() === '') {
+    findings.error(file, 'title must be a non-empty string');
+  }
+  if (typeof status !== 'string' || !(CHANGE_STATUSES as readonly string[]).includes(status)) {
+    findings.error(file, `status must be one of ${CHANGE_STATUSES.join(', ')}`);
+  }
+  if (typeof sha !== 'string' || !/^[0-9a-f]{7,64}$/.test(sha)) {
+    findings.error(file, 'base_sha must be the Git SHA recorded before the first code change, so review has a stable base');
+  }
+  for (const key of Object.keys(front.data)) {
+    if (!['title', 'status', 'base_sha'].includes(key)) {
+      findings.error(file, `unexpected change field "${key}"`);
+    }
+  }
+  checkSections(file, CHANGE_SECTIONS, findings);
+  checkNoPlaceholders(file, findings);
+  const templates = templateDir(packs);
+  checkNotTemplate(file, templates === null ? null : join(templates, 'change.md'), CHANGE_SECTIONS, findings);
+}
+
 export function validatePlan(planDir: string, packs: PackSet, findings: Findings): void {
   const feature = basename(planDir);
   if (!isSlug(feature)) {
@@ -251,6 +288,15 @@ export function validatePlan(planDir: string, packs: PackSet, findings: Findings
   }
 
   const planPath = join(planDir, 'plan.yml');
+  const change = changeFile(planDir);
+  if (exists(change)) {
+    if (exists(planPath)) {
+      findings.error(change, 'a directory holds either a feature plan or a small change, not both');
+      return;
+    }
+    validateChange(change, packs, findings);
+    return;
+  }
   const plan = readPlan(planDir);
   if (!plan) {
     findings.error(planPath, exists(planPath) ? 'plan.yml must contain a YAML mapping' : 'file is missing');

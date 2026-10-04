@@ -291,7 +291,7 @@ function isArtifact(token: string): boolean {
 }
 
 /** Files that live inside a feature plan package, wherever it is configured. */
-const PLAN_FILES = new Set(['plan.yml', 'requirements.md', 'specification.md']);
+const PLAN_FILES = new Set(['plan.yml', 'requirements.md', 'specification.md', 'change.md']);
 
 /**
  * Turns a path as a skill writes it into a repository path.
@@ -304,6 +304,7 @@ export function resolveArtifact(token: string, plansDir: string): string {
   const path = token
     .replace(/^<plans>/, plansDir)
     .replaceAll('<feature-slug>', FEATURE)
+    .replaceAll('<change-slug>', FEATURE)
     .replace(/^\.\//, '');
   if (PLAN_FILES.has(path) || path.startsWith('tickets/')) {
     return `${plansDir}/${FEATURE}/${path}`;
@@ -357,8 +358,11 @@ function namedSkills(body: string, context: SkillContext) {
 
 function readStep(section: Section, context: SkillContext): Step {
   const { body } = section;
-  const artifacts = unique(codeTokens(body).filter(isArtifact)).map((token) =>
-    resolveArtifact(token, context.plansDir),
+  // Resolve before deduplicating: `change.md` and `<plans>/<change-slug>/change.md` are one file.
+  const artifacts = unique(
+    codeTokens(body)
+      .filter(isArtifact)
+      .map((token) => resolveArtifact(token, context.plansDir)),
   );
 
   return {

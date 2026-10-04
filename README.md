@@ -41,6 +41,7 @@ And the skills that produce and consume them, in the place each of your agents a
 | *"Make a plan to implement password recovery"* | Grounds it in your sources, designs it against your codebase, splits it into vertical tickets — then stops for your review |
 | *"Implement the plan"* | Runs tickets in dependency order, test-first, verifying each with your checks, then reviews the whole diff |
 | *"Resume the password-recovery plan"* | Picks up from the stage recorded in `plan.yml` |
+| *"Show a zero price as Free"* | Too small to plan: states a short contract, asks whether to record it, builds it test-first, and reviews the diff against that contract — off the board, no plan |
 
 ## Why a swarm needs this
 
