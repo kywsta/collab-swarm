@@ -2,7 +2,7 @@
 paths:
   - ".docs/changes/**"
   - "docs/changes/**"
-description: Invariants for feature plan documents — plan.yml, requirements, specification and tickets — and for recorded small changes.
+description: Invariants for feature plan documents — plan.yml, requirements, specification and tickets — for recorded small changes, and for the delivery history.
 ---
 
 # Feature plan rule
@@ -17,4 +17,5 @@ Full contract: [the workflow](../workflow/WORKFLOW.md) and [artifact formats](..
 - Dependencies name other ticket slugs, form no cycle, and a ticket becomes active only once they are `done`.
 - A `deferred` ticket names what it waits for under `## Deferred`; a `blocked` ticket names the decision it needs under `## Blocked`.
 - A recorded small change is a lone `change.md`, owned by `small-change`: front matter `title`, `status` (`in-progress` or `complete`), and `base_sha`; sections `What changes`, `Why`, `Acceptance criteria`, `Out of scope`, `Tests`. Never beside a `plan.yml`.
+- `HISTORY.md` beside the plans is owned by `compact-history`. A slug is a live directory or a history row, never both; each row names a commit that still holds its plan, and a status of `delivered`, `superseded` or `dropped`. Never compact a directory the default branch does not hold, or one with a deferred ticket still owed.
 - Run `npx collab-swarm validate` after changing any of these files.

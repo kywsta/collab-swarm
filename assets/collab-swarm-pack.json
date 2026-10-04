@@ -49,6 +49,10 @@
       "role": "stage"
     },
     {
+      "name": "compact-history",
+      "role": "stage"
+    },
+    {
       "name": "tdd",
       "role": "ticket"
     },

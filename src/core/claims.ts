@@ -2,7 +2,8 @@
  * Delivery claims, read and written through Git alone.
  *
  * A claim is the branch `<prefix><slug>` on the remote carrying
- * `<plans>/<slug>/plan.yml`. Done is that plan complete on the default branch.
+ * `<plans>/<slug>/plan.yml`. Done is that plan complete on the default branch,
+ * or — once the plan has been compacted — its row in `<plans>/HISTORY.md` there.
  * No tracker outside Git is consulted or written, so every developer and every
  * agent sees the same board after one fetch.
  */
@@ -12,6 +13,7 @@ import type { GitConfig } from '../config.js';
 import { exists, listDirs, readText, writeText } from '../util/fs.js';
 import { asDict, asString, isSlug, parseYaml } from '../util/yaml.js';
 import { Git } from './git.js';
+import { countsAsDone, historyAt } from './history.js';
 import { newPlan, serializePlan } from './plan.js';
 
 export interface Claim {
@@ -24,6 +26,8 @@ export interface Claim {
   status: string | null;
   lastCommitAt: Date | null;
   isPushed: boolean;
+  /** Done through a row in the delivery history; the plan directory is gone. */
+  compacted?: boolean;
 }
 
 export const isComplete = (claim: Claim) => claim.status === 'complete';
@@ -65,7 +69,9 @@ export class Claims {
     }
     const claims = [...this.branchClaims(), ...this.mainClaims()];
     const known = new Set(claims.map((claim) => claim.slug));
-    return [...claims, ...this.localClaims(known)];
+    const compacted = this.historyClaims(known);
+    for (const claim of compacted) known.add(claim.slug);
+    return [...claims, ...compacted, ...this.localClaims(known)];
   }
 
   private planAt(ref: string, slug: string): { stage: string | null; status: string | null } | null {
@@ -133,6 +139,28 @@ export class Claims {
       });
     }
     return claims;
+  }
+
+  /**
+   * Plans compacted into the delivery history on the default branch. Their
+   * directories are gone, so without these a delivered row would read as
+   * available again and everything waiting on it as blocked.
+   */
+  private historyClaims(known: Set<string>): Claim[] {
+    const ref = this.mainRef();
+    const entries = historyAt(this.git, ref, this.plansDir) ?? [];
+    return entries
+      .filter((entry) => countsAsDone(entry) && !known.has(entry.slug))
+      .map((entry) => ({
+        slug: entry.slug,
+        holder: 'history',
+        ref,
+        stage: 'complete',
+        status: 'complete',
+        lastCommitAt: null,
+        isPushed: true,
+        compacted: true,
+      }));
   }
 
   /** Plans that exist in this checkout but nowhere on the remote. */

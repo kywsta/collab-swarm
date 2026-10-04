@@ -126,7 +126,9 @@ export class Board {
       case 'available':
         return null;
       case 'done':
-        return `"${slug}" is already done (plan complete on ${row.claim?.ref ?? 'the default branch'}).`;
+        return row.claim?.compacted
+          ? `"${slug}" is already done (delivered, and compacted into the delivery history on ${row.claim.ref}).`
+          : `"${slug}" is already done (plan complete on ${row.claim?.ref ?? 'the default branch'}).`;
       case 'in-progress': {
         const claim = row.claim!;
         const where = claim.isPushed ? claim.ref : `${claim.ref} (unpushed plan in this checkout)`;

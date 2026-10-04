@@ -47,13 +47,13 @@ Columns are matched by header name, so they may be renamed and reordered. `Slug`
 
 The slug cell is kebab-case, normally in backticks. `Depends on` mixes three kinds of blocker in one cell, each resolved differently:
 
-- **`` `other-slug` ``** — another row, freed when its plan is complete on the default branch. Backticks are what mark it as a slug.
+- **`` `other-slug` ``** — another row, freed when its plan is complete on the default branch, or listed as delivered in the delivery history there. The slug may name a row `compact-history` has since retired; it stays done. Backticks are what mark it as a slug.
 - **`G<n>`** — a human gate, freed when the tracker's status stops saying `open`.
 - **`D<n>`** — a product decision, freed by an answer or by a recorded working assumption.
 
 The phrase *every earlier feature* (or *all features*) in that cell expands to every row in an earlier milestone, which is how a release-readiness row waits for the whole backlog without listing it.
 
-Add no status column: a row's state is derived from Git — claimed by a branch, done by a complete plan on the default branch — and a hand-maintained status cell only contradicts it.
+Add no status column: a row's state is derived from Git — claimed by a branch, done by a complete plan on the default branch or a delivered row in the history — and a hand-maintained status cell only contradicts it.
 
 ## Gate tracker
 

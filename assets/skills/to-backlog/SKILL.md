@@ -70,7 +70,7 @@ Done when every gate has an owner and a status, every `open` gate genuinely stop
 
 Write `backlog:` following [the backlog format](BACKLOG-FORMAT.md), seeded from [the template](../../workflow/templates/backlog.md) when the file does not exist yet.
 
-Updating an existing plan is a reconciliation, not a rewrite: keep every slug already claimed or done exactly as it is, keep the rows they depend on, and add, resequence or retire the rest. A row that turned out to be wrong is deleted with its reason noted in the commit message, not marked with a status column — state is derived from Git.
+Updating an existing plan is a reconciliation, not a rewrite: keep every slug already claimed or done exactly as it is, keep the rows they depend on, and add, resequence or retire the rest. A slug in the delivery history (`<plans>/HISTORY.md`) is done and never reused for new work; delivered milestones are retired by `compact-history`, not here. A row that turned out to be wrong is deleted with its reason noted in the commit message, not marked with a status column — state is derived from Git.
 
 The plan says **what** is being built and **who waits on whom**. How a feature is planned, implemented, reviewed and completed lives in the workflow contract; restating it here creates a second copy to keep true.
 
