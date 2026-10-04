@@ -12,6 +12,18 @@ The backlog is one Markdown file — `backlog:` in `collab-swarm.yml` — holdin
 
 A row is planned from the [sources](#sources-of-truth), so a capability no source describes is shaped before it is registered: `new-feature` researches what exists, interviews until the behaviour is settled, writes the product, design and API documents, and hands the rows to `to-backlog`. A change to behaviour a source already describes skips that and goes straight to a plan.
 
+Not every change is a feature. A fix, a tweak, or a copy or configuration change that fits one ticket is a [small change](#small-changes): no row, no plan, and a short contract instead.
+
+## Small changes
+
+`small-change` delivers a change too small to plan, without pretending it needs no contract. Review judges a diff against what it was meant to do, so even a one-line fix states it: what changes, why, one to three named acceptance criteria, what is out of scope, and where it is tested.
+
+A change is small when it fits one ticket, adds no behaviour that no source describes, needs no new secret, permission, destructive migration or operation another team owes, and does not continue an open plan. When any of these fails, it goes to `deliver-change` or `new-feature` instead — and a small change that outgrows its contract mid-way stops and is handed over.
+
+**Recorded or not is the user's call, every time.** The agent presents the contract and asks whether to record it. A recorded change is one file, `<plans>/<change-slug>/change.md`, carrying the contract, its status and the review base; `validate` checks it, `code-review` reads it, and a later session can resume it. An unrecorded change keeps its contract in the conversation and puts its what and why in the commit message or pull request body.
+
+Either way a small change is off the delivery board: it is not a row, claims nothing, and is never offered by `whats-next`. It is built with `tdd` and the pack's router, verified with the project checks, and reviewed by `code-review` on both axes, with the contract as the Feature axis.
+
 ## Package
 
 One feature plan lives at `<plans>/<feature-slug>/`, where `<plans>` is the `plans:` directory in `collab-swarm.yml` (`.docs/changes` by default):
@@ -139,7 +151,7 @@ A ticket runs it with a focused test path; completion and cross-cutting work run
 Review the whole feature against two questions:
 
 1. Does the diff follow repository and architecture standards?
-2. Does it deliver the requirements and specification?
+2. Does it deliver the requirements and specification — or, for a small change, its contract?
 
 Run every review-role skill an installed pack provides, for the surfaces that changed.
 

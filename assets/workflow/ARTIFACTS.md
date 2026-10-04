@@ -64,6 +64,20 @@ Ticket filenames and dependency values are kebab-case slugs. Ticket statuses are
 
 `skills` lists only skills whose role is *implements a ticket*. Run `npx collab-swarm packs` to see them; the validator rejects anything else.
 
+## Small change
+
+A recorded [small change](WORKFLOW.md#small-changes) is one file in place of a plan, `<plans>/<change-slug>/change.md`, seeded from `templates/change.md`:
+
+```yaml
+---
+title: Show a zero price as "Free"
+status: in-progress
+base_sha: 1a2b3c4d
+---
+```
+
+Statuses are `in-progress` and `complete`. `base_sha` is the Git SHA recorded before the first code change. The body contains `What changes`, `Why`, `Acceptance criteria`, `Out of scope`, and `Tests`; `None.` is a complete answer for `Out of scope`. A directory holds a `change.md` or a `plan.yml`, never both. An unrecorded small change writes no file.
+
 ## History and verification
 
 Git records edits to plan artifacts and code. Test commands and review results are reported in the task and, when valuable long-term, in normal project documentation. The workflow does not create approval hashes, revision copies, event logs, attempt leases, traceability matrices, or evidence directories.

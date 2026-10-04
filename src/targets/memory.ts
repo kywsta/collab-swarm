@@ -119,6 +119,10 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
           'Tickets run in dependency order with `implement`, each verified with the project checks; then `code-review`',
         ],
         ['`Resume the <slug> plan`', 'Continues from the stage recorded in `plan.yml`'],
+        [
+          '`Fix <small thing>` / `Change <small thing>`',
+          '`small-change` states a short contract, asks whether to record it, builds it test-first, and reviews it against that contract; anything bigger goes to a plan',
+        ],
       ],
     ),
   );
@@ -129,7 +133,7 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
   lines.push('Non-negotiable. A change that breaks one is not done, whatever else it achieves.');
   lines.push('');
   const rules: string[] = [
-    `**Spec first.** Feature code exists only under a plan in \`${config.plans}/<slug>/\` with requirements, specification, and tickets. No plan, no code.`,
+    `**Spec first.** Feature code exists only under a plan in \`${config.plans}/<slug>/\` with requirements, specification, and tickets, or is a small change with a contract the user confirmed through \`small-change\`. No contract, no code.`,
     Object.keys(config.sources).length > 0
       ? '**Grounded, not invented.** Behaviour comes from the sources listed below. A question the sources leave open is recorded and asked, never answered in code.'
       : '**Grounded, not invented.** Behaviour comes from the request and the code already here. A question neither answers is asked, never guessed.',

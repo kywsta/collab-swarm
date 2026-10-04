@@ -72,6 +72,12 @@ export const SPECIFICATION_SECTIONS = [
 
 export const TICKET_SECTIONS = ['Outcome', 'Requirements', 'Implementation', 'Tests', 'Done when'];
 
+/** A recorded small change: one file in place of a plan, off the delivery board. */
+export const CHANGE_STATUSES = ['in-progress', 'complete'] as const;
+export type ChangeStatus = (typeof CHANGE_STATUSES)[number];
+
+export const CHANGE_SECTIONS = ['What changes', 'Why', 'Acceptance criteria', 'Out of scope', 'Tests'];
+
 export interface Plan {
   schemaVersion: number;
   workflowVersion: number;
@@ -97,6 +103,7 @@ export const planFile = (planDir: string) => join(planDir, 'plan.yml');
 export const requirementsFile = (planDir: string) => join(planDir, 'requirements.md');
 export const specificationFile = (planDir: string) => join(planDir, 'specification.md');
 export const ticketsDir = (planDir: string) => join(planDir, 'tickets');
+export const changeFile = (planDir: string) => join(planDir, 'change.md');
 
 export const stamp = (at: Date = new Date()) => at.toISOString().replace(/\.\d+/, '');
 

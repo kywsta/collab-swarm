@@ -426,6 +426,32 @@ describe('validate', () => {
     assert.match(run(dir).errors.map((f) => f.message).join(), /must record what it waits for/);
   });
 
+  const changeBody = section(['What changes', 'Why', 'Acceptance criteria', 'Tests']) + '\n## Out of scope\n\nNone.\n';
+  const writeChange = (dir, front) => writeText(join(dir, 'change.md'), `---\n${front}\n---\n\n${changeBody}`);
+
+  it('accepts a recorded small change: a lone change.md with no plan', () => {
+    const dir = join(tempRepo(), 'zero-price-label');
+    writeChange(dir, 'title: Show a zero price as Free\nstatus: in-progress\nbase_sha: 1a2b3c4d');
+    assert.deepEqual(run(dir).errors, []);
+  });
+
+  it('requires a small change to carry its review base and a known status', () => {
+    const dir = join(tempRepo(), 'zero-price-label');
+    writeChange(dir, 'title: Zero price\nstatus: done\nbase_sha: null\nowner: me');
+    const messages = run(dir).errors.map((f) => f.message).join('\n');
+    assert.match(messages, /status must be one of in-progress, complete/);
+    assert.match(messages, /base_sha must be the Git SHA/);
+    assert.match(messages, /unexpected change field "owner"/);
+  });
+
+  it('rejects a small change missing a contract section, or sitting beside a plan', () => {
+    const dir = join(tempRepo(), 'demo');
+    writeText(join(dir, 'change.md'), `---\ntitle: Demo\nstatus: complete\nbase_sha: 1a2b3c4d\n---\n\n${section(['What changes', 'Why'])}`);
+    assert.match(run(dir).errors.map((f) => f.message).join(), /required section "Acceptance criteria" is missing/);
+    complete(dir);
+    assert.match(run(dir).errors.map((f) => f.message).join(), /either a feature plan or a small change/);
+  });
+
   it('rejects a section still holding the template text, but accepts "None."', () => {
     const dir = join(tempRepo(), 'demo');
     complete(dir);
