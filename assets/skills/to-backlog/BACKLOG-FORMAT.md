@@ -52,6 +52,8 @@ The slug cell is kebab-case, normally in backticks. `Depends on` mixes three kin
 - **`G<n>`** — a human gate, freed when the tracker's status stops saying `open`.
 - **`D<n>`** — a product decision, freed by an answer or by a recorded working assumption.
 
+A slug must be able to become done: another row, a plan under the plans directory, or a `delivered` or `superseded` row in the history. `validate` reports any other — a misspelling, a deleted row, a dropped one — because the row naming it would stay blocked for good.
+
 The phrase *every earlier feature* (or *all features*) in that cell expands to every row in an earlier milestone, which is how a release-readiness row waits for the whole backlog without listing it.
 
 In a hub, a `Repositories` cell such as `` `api`, `participant` `` lets `claim` open the feature's branch in each of them at once; the specification can add more later. Every name must be configured under `repositories:` in `collab-swarm.yml`, and `validate` reports one that is not. A row whose code lands in a repository is done only once its branch has merged there.

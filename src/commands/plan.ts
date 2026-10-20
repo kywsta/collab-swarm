@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { flagString, type Args } from '../cli.js';
 import { PROGRAM } from '../util/program.js';
 import { inRoot, loadConfig } from '../config.js';
+import { Git } from '../core/git.js';
 import { newPlan, serializePlan } from '../core/plan.js';
 import { exists, writeText } from '../util/fs.js';
 import { CliError, ok, out, style } from '../util/log.js';
@@ -41,7 +42,8 @@ export async function run(args: Args): Promise<number> {
 
   const title =
     flagString(args, 'title') ?? slug.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
-  writeText(join(dir, 'plan.yml'), serializePlan(newPlan(slug, title)));
+  const sourcesSha = new Git(root).headSha;
+  writeText(join(dir, 'plan.yml'), serializePlan(newPlan(slug, title, new Date(), [], sourcesSha)));
 
   ok(`Opened ${config.plans}/${slug}/plan.yml at the requirements stage`);
   out('');

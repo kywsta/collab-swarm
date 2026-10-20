@@ -15,7 +15,7 @@ Resume a matching open plan, including a lone `plan.yml` at stage `requirements`
 
 A plan is written from the sources, so a request whose behaviour no source describes goes to `new-feature` first, which interviews the user, writes the product, design and API documents, and registers the feature. A request that changes behaviour a source already describes is planned here. A request that fits one ticket and the user did not ask to plan — a fix, a tweak, a copy or configuration change — goes to `small-change` instead.
 
-Run `npx collab-swarm validate` before resuming an existing plan.
+Run `npx collab-swarm validate` before resuming an existing plan. When it warns that sources the plan cites changed on the default branch since its `sources_sha`, the plan is out of date: merge the default branch, return the plan to the requirements stage, and revise it from the changed sections — the specification and tickets too, reopening as `planned` any `done` ticket whose behaviour changed. Tell the user what changed and what it moved before continuing; when the change makes the feature pointless, stop and ask whether to drop it.
 
 Done when one package owns the feature and its current stage is known.
 
@@ -23,7 +23,7 @@ Done when one package owns the feature and its current stage is known.
 
 Run all planning stages in one pass:
 
-1. Use `to-requirements` to write `requirements.md` from the configured sources and applicable project constraints.
+1. Use `to-requirements` to write `requirements.md` from the configured sources and applicable project constraints, then set `sources_sha` in `plan.yml` to the current `HEAD`: the commit whose sources it read.
 2. Use `to-spec` to write `specification.md` from the requirements and current codebase.
 3. Use `to-tickets` to write descriptive vertical tickets.
 4. In a hub, make `plan.yml` list every repository the specification puts work in. Add one the claim did not open with `npx collab-swarm repos <slug> --open <name>`, which pushes its branch and records its base.

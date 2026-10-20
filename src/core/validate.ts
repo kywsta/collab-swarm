@@ -6,7 +6,9 @@ import { readPackFile, ticketSkills } from '../packs.js';
 import { unresolvedMarkers, unresolvedVars } from '../options.js';
 import { exists, listDirs, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
-import { historyFindings, historyPath } from './history.js';
+import { Git } from './git.js';
+import { countsAsDone, historyFindings, historyPath, parseHistory } from './history.js';
+import { driftCheck, type DriftCheck } from './impact.js';
 import { Register } from './register.js';
 import { RULES_ROOT, RULE_ORIGINS, ROOT_SCOPE, type RuleSet } from './rulesets.js';
 import {
@@ -39,6 +41,8 @@ import {
 export interface PlanContext {
   /** The code repositories the configuration coordinates. */
   repositories?: Record<string, RepositoryConfig>;
+  /** Whether a plan's cited sources moved on the default branch since it was written. */
+  drift?: DriftCheck | null;
 }
 
 const SHA = /^[0-9a-f]{7,64}$/;
@@ -424,6 +428,12 @@ export function validatePlan(
   if (sha !== null && !SHA.test(sha)) {
     findings.error(planPath, 'implementation_base_sha is not a Git SHA');
   }
+  if (plan.sourcesSha !== null && !SHA.test(plan.sourcesSha)) {
+    findings.error(planPath, 'sources_sha is not a Git SHA');
+  } else {
+    const drift = context.drift?.check(planDir, plan);
+    if (drift) findings.warn(planPath, drift);
+  }
   if (stageOk && stageAtLeast(plan.stage, 'implementation') && sha === null) {
     findings.error(
       planPath,
@@ -528,6 +538,39 @@ function checkRepositories(root: string, config: Config, findings: Findings): vo
 }
 
 /**
+ * Every slug a row waits on must be able to become done: another row, a plan,
+ * or a delivered row in the history. A deleted or misspelt slug otherwise keeps
+ * the row blocked for good, and the board can only say it "is not done".
+ */
+function checkDependencies(root: string, config: Config, findings: Findings): void {
+  if (!config.backlog) return;
+  const file = inRoot(root, config.backlog);
+  const backlog = readTextOrNull(file);
+  if (backlog === null) return;
+  const rows = Register.parse(backlog).rows;
+  const history = parseHistory(readTextOrNull(inRoot(root, historyPath(config.plans))) ?? '');
+  const dropped = new Set(history.filter((entry) => !countsAsDone(entry)).map((entry) => entry.slug));
+  const known = new Set([
+    ...rows.map((row) => row.slug),
+    ...listPlanDirs(inRoot(root, config.plans)),
+    ...history.filter(countsAsDone).map((entry) => entry.slug),
+  ]);
+  for (const row of rows) {
+    for (const dependency of row.dependsOn) {
+      if (known.has(dependency)) continue;
+      findings.error(
+        file,
+        dropped.has(dependency)
+          ? `row "${row.slug}" depends on "${dependency}", which the delivery history records as dropped, ` +
+              `so it never counts as done and "${row.slug}" stays blocked; remove the dependency or name what replaced it`
+          : `row "${row.slug}" depends on "${dependency}", which is no row, no plan and nothing the delivery history delivered, ` +
+              `so "${row.slug}" stays blocked; correct the slug or remove the dependency`,
+      );
+    }
+  }
+}
+
+/**
  * Rule sets: one directory per repository that exists, rules whose author is
  * known, and globs written relative to the repository they govern — the
  * repository's path is added on publishing, so writing it again doubles it.
@@ -555,6 +598,13 @@ function checkRuleSets(root: string, config: Config, sets: RuleSet[], findings: 
       }
     }
   }
+}
+
+/** The drift check for this checkout's plans, reading each row's sources from the backlog. */
+export function planDrift(root: string, config: Config): DriftCheck | null {
+  const backlog = config.backlog ? readTextOrNull(inRoot(root, config.backlog)) : null;
+  const register = backlog === null ? Register.empty() : Register.parse(backlog);
+  return driftCheck(new Git(root), root, config, (slug) => register.row(slug)?.sources ?? '');
 }
 
 /** Every plan under the configured plans root, plus the repository's own wiring. */
@@ -604,6 +654,7 @@ export function validateRepository(
     }
 
     checkRepositories(root, config, findings);
+    checkDependencies(root, config, findings);
 
     // An unscoped rule is loaded into every agent turn, which is almost never
     // what a pack meant: a rule earns its place by being narrow.
@@ -653,8 +704,9 @@ export function validateRepository(
   }
 
   const plansRoot = inRoot(root, config.plans);
+  const drift = planDrift(root, config);
   for (const dir of listPlanDirs(plansRoot)) {
-    validatePlan(join(plansRoot, dir), packs, findings, { repositories: config.repositories });
+    validatePlan(join(plansRoot, dir), packs, findings, { repositories: config.repositories, drift });
   }
 
   const history = inRoot(root, historyPath(config.plans));

@@ -326,7 +326,8 @@ export class Claims {
     }
 
     const file = join(this.root, this.planPath(slug));
-    writeText(file, serializePlan(newPlan(slug, title, options.at, opened.repositories)));
+    const sourcesSha = this.git.maybe(['rev-parse', base])?.trim() ?? null;
+    writeText(file, serializePlan(newPlan(slug, title, options.at, opened.repositories, sourcesSha)));
     this.git.run(['add', '--', this.planPath(slug)]);
     const committed = this.git.run(['commit', '--quiet', '-m', `chore(${slug}): claim delivery row`]);
     if (!committed.ok) {

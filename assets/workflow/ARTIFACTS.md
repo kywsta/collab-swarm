@@ -22,6 +22,7 @@ feature: password-recovery
 title: Password recovery
 stage: tickets
 status: ready
+sources_sha: 4be1c0d27a9e
 implementation_base_sha: null
 created_at: "2026-09-02T00:00:00Z"
 updated_at: "2026-09-02T00:00:00Z"
@@ -30,6 +31,8 @@ updated_at: "2026-09-02T00:00:00Z"
 Stages are `requirements`, `specification`, `tickets`, `implementation`, `review`, and `complete`. Statuses are `in-progress`, `ready`, `blocked`, and `complete`.
 
 `ready` means the complete plan is waiting for the user's implementation instruction. Set `implementation_base_sha` when implementation starts so a resumed review has a stable Git baseline. It is internal resume state, not something the user approves.
+
+`sources_sha` is the commit whose sources the requirements were written from. `claim` and `plan` set it to the commit the plan starts from; set it again to the current `HEAD` whenever the requirements are written or revised from the sources. `validate` compares it with the default branch and warns when a source the plan cites has changed there since — the plan may be building what is no longer asked for. A plan written before this field existed simply has none, and `validate` asks for it once requirements exist.
 
 In a [hub](WORKFLOW.md#code-repositories), the plan also lists the code repositories the feature touches, each with the commit its branch was cut from:
 

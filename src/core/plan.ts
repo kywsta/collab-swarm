@@ -92,6 +92,12 @@ export interface Plan {
   title: string;
   stage: PlanStage;
   status: PlanStatus;
+  /**
+   * The commit whose sources the requirements were written from. A source the
+   * plan cites that changed on the default branch since then means the plan
+   * may be building behaviour that is no longer asked for.
+   */
+  sourcesSha: string | null;
   implementationBaseSha: string | null;
   /** The code repositories this feature touches, when the plans live in a hub. */
   repositories: PlanRepository[];
@@ -150,6 +156,7 @@ export function readPlan(planDir: string): Plan | null {
     title: asString(raw.title) ?? '',
     stage: (asString(raw.stage) ?? '') as PlanStage,
     status: (asString(raw.status) ?? '') as PlanStatus,
+    sourcesSha: asString(raw.sources_sha),
     implementationBaseSha: asString(raw.implementation_base_sha),
     repositories: parsePlanRepositories(raw.repositories),
     createdAt: asString(raw.created_at) ?? '',
@@ -165,6 +172,7 @@ export function serializePlan(plan: Plan): string {
     title: plan.title,
     stage: plan.stage,
     status: plan.status,
+    sources_sha: plan.sourcesSha,
     implementation_base_sha: plan.implementationBaseSha,
   };
   // Absent rather than empty, so a single-repository plan reads as it always has.
@@ -182,12 +190,18 @@ export function writePlan(planDir: string, plan: Plan): void {
   writeText(planFile(planDir), serializePlan(plan));
 }
 
-/** The skeleton a fresh claim pushes: a lone plan.yml at the requirements stage. */
+/**
+ * The skeleton a fresh claim pushes: a lone plan.yml at the requirements stage.
+ *
+ * `sourcesSha` is the commit the plan's checkout starts from, so the sources
+ * it will be written from are known before a word of it exists.
+ */
 export function newPlan(
   slug: string,
   title: string,
   at: Date = new Date(),
   repositories: PlanRepository[] = [],
+  sourcesSha: string | null = null,
 ): Plan {
   const now = stamp(at);
   return {
@@ -197,6 +211,7 @@ export function newPlan(
     title,
     stage: 'requirements',
     status: 'in-progress',
+    sourcesSha,
     implementationBaseSha: null,
     repositories,
     createdAt: now,

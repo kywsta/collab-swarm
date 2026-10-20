@@ -92,6 +92,7 @@ ${style.bold('Deliver')}
   plan <slug> [--title T]  Scaffold a feature plan package locally
   validate [<plan-dir>]    Check the workflow contract and every plan
   history                  What has been delivered, and what can be compacted
+  impact [--since <ref>]   Which rows and plans a change to the sources reaches
   check [--focus <path>]   Run the project's configured checks
         [--repo <name>]    ...only those of one coordinated repository
 
@@ -124,6 +125,8 @@ async function dispatch(args: Args): Promise<number> {
       return (await import('./commands/rules.js')).run(args);
     case 'history':
       return (await import('./commands/history.js')).run(args);
+    case 'impact':
+      return (await import('./commands/impact.js')).run(args);
     case 'plan':
       return (await import('./commands/plan.js')).run(args);
     case 'check':

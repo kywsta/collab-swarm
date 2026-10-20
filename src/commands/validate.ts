@@ -1,7 +1,7 @@
 import { isAbsolute, join, resolve } from 'node:path';
 import { flagBool, type Args } from '../cli.js';
 import { inRoot, loadConfig } from '../config.js';
-import { Findings, validatePlan, validateRepository } from '../core/validate.js';
+import { Findings, planDrift, validatePlan, validateRepository } from '../core/validate.js';
 import { loadWorkspace } from '../workspace.js';
 import { listPlanDirs } from '../core/plan.js';
 import { fail, ok, out, style, warn } from '../util/log.js';
@@ -17,7 +17,7 @@ export async function run(args: Args): Promise<number> {
   if (target) {
     const dir = isAbsolute(target) ? target : resolve(process.cwd(), target);
     findings = new Findings(root);
-    validatePlan(dir, packs, findings, { repositories: config.repositories });
+    validatePlan(dir, packs, findings, { repositories: config.repositories, drift: planDrift(root, config) });
   } else {
     findings = validateRepository(root, config, packs);
   }
