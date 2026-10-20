@@ -11,6 +11,8 @@ import { countsAsDone, historyFindings, parseHistory, survey } from '../dist/cor
 import { newPlan, serializePlan } from '../dist/core/plan.js';
 import { Register } from '../dist/core/register.js';
 import { parseConfig } from '../dist/config.js';
+import { loadPacks } from '../dist/packs.js';
+import { validateRepository } from '../dist/core/validate.js';
 import { writeText } from '../dist/util/fs.js';
 
 const scratch = [];
@@ -207,5 +209,30 @@ describe('compacting against a real remote', () => {
     );
     const result = survey(root, config);
     assert.match(result.problems[0].message, /does not hold plans\/app-shell/);
+  });
+});
+
+describe('row dependencies', () => {
+  it('reports a dependency that can never be done, and accepts every kind that can', () => {
+    const root = tempDir();
+    writeText(
+      join(root, 'backlog.md'),
+      `### M1 · Entry
+
+| Slug | Title | Depends on |
+| --- | --- | --- |
+| \`guest-home-v2\` | Guest home | \`guest-home\`, \`app-shell\`, \`search\`, G1, D7 |
+| \`search\` | Search | \`planned-only\` |
+| \`wallet\` | Wallet | \`wallet-sync\`, \`sign-up\` |
+`,
+    );
+    writeText(join(root, 'plans', 'HISTORY.md'), HISTORY);
+    writeText(join(root, 'plans', 'planned-only', 'plan.yml'), serializePlan(newPlan('planned-only', 'Planned only')));
+
+    const findings = validateRepository(root, config, loadPacks(process.cwd(), []));
+    const messages = findings.errors.map((finding) => finding.message).filter((message) => /depends on/.test(message));
+    assert.equal(messages.length, 2, messages.join('\n'));
+    assert.match(messages[0], /row "wallet" depends on "wallet-sync", which the delivery history records as dropped/);
+    assert.match(messages[1], /row "wallet" depends on "sign-up", which is no row, no plan/);
   });
 });

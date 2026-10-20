@@ -7,7 +7,7 @@ import { unresolvedMarkers, unresolvedVars } from '../options.js';
 import { exists, listDirs, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
 import { Git } from './git.js';
-import { historyFindings, historyPath } from './history.js';
+import { countsAsDone, historyFindings, historyPath, parseHistory } from './history.js';
 import { driftCheck, type DriftCheck } from './impact.js';
 import { Register } from './register.js';
 import { RULES_ROOT, RULE_ORIGINS, ROOT_SCOPE, type RuleSet } from './rulesets.js';
@@ -538,6 +538,39 @@ function checkRepositories(root: string, config: Config, findings: Findings): vo
 }
 
 /**
+ * Every slug a row waits on must be able to become done: another row, a plan,
+ * or a delivered row in the history. A deleted or misspelt slug otherwise keeps
+ * the row blocked for good, and the board can only say it "is not done".
+ */
+function checkDependencies(root: string, config: Config, findings: Findings): void {
+  if (!config.backlog) return;
+  const file = inRoot(root, config.backlog);
+  const backlog = readTextOrNull(file);
+  if (backlog === null) return;
+  const rows = Register.parse(backlog).rows;
+  const history = parseHistory(readTextOrNull(inRoot(root, historyPath(config.plans))) ?? '');
+  const dropped = new Set(history.filter((entry) => !countsAsDone(entry)).map((entry) => entry.slug));
+  const known = new Set([
+    ...rows.map((row) => row.slug),
+    ...listPlanDirs(inRoot(root, config.plans)),
+    ...history.filter(countsAsDone).map((entry) => entry.slug),
+  ]);
+  for (const row of rows) {
+    for (const dependency of row.dependsOn) {
+      if (known.has(dependency)) continue;
+      findings.error(
+        file,
+        dropped.has(dependency)
+          ? `row "${row.slug}" depends on "${dependency}", which the delivery history records as dropped, ` +
+              `so it never counts as done and "${row.slug}" stays blocked; remove the dependency or name what replaced it`
+          : `row "${row.slug}" depends on "${dependency}", which is no row, no plan and nothing the delivery history delivered, ` +
+              `so "${row.slug}" stays blocked; correct the slug or remove the dependency`,
+      );
+    }
+  }
+}
+
+/**
  * Rule sets: one directory per repository that exists, rules whose author is
  * known, and globs written relative to the repository they govern — the
  * repository's path is added on publishing, so writing it again doubles it.
@@ -621,6 +654,7 @@ export function validateRepository(
     }
 
     checkRepositories(root, config, findings);
+    checkDependencies(root, config, findings);
 
     // An unscoped rule is loaded into every agent turn, which is almost never
     // what a pack meant: a rule earns its place by being narrow.
