@@ -1,5 +1,6 @@
 import type { Config } from '../config.js';
 import type { PackSet, RuleEntry, SkillEntry } from '../packs.js';
+import type { RuleSet } from '../core/rulesets.js';
 
 /** One file an emitter wants on disk, with content already rendered. */
 export interface Emission {
@@ -25,6 +26,10 @@ export interface EmitContext {
   skills: SkillEntry[];
   /** Rules to publish, in stable order. */
   rules: RuleEntry[];
+  /** This repository's own researched stack profile, for the always-loaded block. */
+  profile?: string | null;
+  /** Every rule set, this repository's and each coordinated one's. */
+  ruleSets?: RuleSet[];
   version: string;
 }
 

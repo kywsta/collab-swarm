@@ -69,6 +69,14 @@ export interface RepositoryConfig {
   defaultBranch: string;
   /** Its own checks, run from its own directory. */
   checks: CheckConfig[];
+  /**
+   * Packs this repository's rule set starts from. Optional and empty by
+   * default: a pack is a baseline where one exists for the stack, and the
+   * researched rule set in `.collab-swarm/rules/<name>/` builds on it.
+   */
+  packs: string[];
+  /** Answers to those packs' questions, for this repository alone. */
+  packOptions: Record<string, Selections>;
 }
 
 export interface Config {
@@ -194,6 +202,8 @@ function parseRepositories(raw: unknown, git: GitConfig): Record<string, Reposit
       remote: asString(entry.remote) ?? git.remote,
       defaultBranch: asString(entry.defaultBranch) ?? git.defaultBranch,
       checks: parseChecks(entry.checks),
+      packs: asStringList(entry.packs),
+      packOptions: parsePackOptions(entry.packOptions),
     };
   }
   return repositories;
@@ -265,6 +275,8 @@ export function serializeConfig(config: Config): string {
           ...(repository.remote !== config.git.remote ? { remote: repository.remote } : {}),
           defaultBranch: repository.defaultBranch,
           checks: repository.checks.map(serializeCheck),
+          ...(repository.packs.length ? { packs: repository.packs } : {}),
+          ...(Object.keys(repository.packOptions).length ? { packOptions: repository.packOptions } : {}),
         },
       ]),
     );

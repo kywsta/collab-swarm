@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { VERSION, flagBool, flagString, type Args } from '../cli.js';
 import { PROGRAM } from '../util/program.js';
 import { CONFIG_FILE, loadConfig, serializeConfig } from '../config.js';
-import { askOptions, describePack, offerChecks, record } from '../attach.js';
+import { askOptions, describePack, offerChecks, packHolder, record } from '../attach.js';
 import { parseSelections } from '../options.js';
 import {
   ROLE_LABEL,
@@ -56,17 +56,9 @@ export interface Scaffold {
   skills: Planned[];
   /** Rule file names, with or without the `.md`. */
   rules: string[];
-  /** What the project said about its stack, for the agent that fills the stubs. */
-  brief?: string;
 }
 
-/**
- * Writes the pack's shape: manifest, one stub per skill, one per rule.
- *
- * Shared with `init`, which offers the same scaffold to a project whose stack
- * no default pack covers, so a pack written by hand and one written by an agent
- * start from the same skeleton.
- */
+/** Writes the pack's shape: manifest, one stub per skill, one per rule. */
 export function scaffoldPack(scaffold: Scaffold): string[] {
   const rules = scaffold.rules.map((rule) => (rule.endsWith('.md') ? rule : `${rule}.md`));
   writeText(
@@ -77,12 +69,8 @@ export function scaffoldPack(scaffold: Scaffold): string[] {
     writeText(join(scaffold.dir, 'skills', skill.name, 'SKILL.md'), skillStub(skill));
   }
   for (const rule of rules) writeText(join(scaffold.dir, 'rules', rule), ruleStub(rule));
-  if (scaffold.brief) writeText(join(scaffold.dir, BRIEF_FILE), scaffold.brief);
   return rules;
 }
-
-/** What the project told `init` about its stack, read by the `to-pack` skill. */
-export const BRIEF_FILE = 'BRIEF.md';
 
 /** A skill file that is valid, loadable, and obviously not written yet. */
 const skillStub = (skill: Planned) =>
@@ -156,7 +144,7 @@ function runList(): number {
   const packs = bundledPacks();
   if (packs.length === 0) {
     info('This collab-swarm ships no default packs.');
-    out(style.dim('  Write one for this project: npx collab-swarm pack new <name>, or ask your agent to run `to-pack`.'));
+    out(style.dim("  A repository's own conventions go in its rule set: ask your agent to run `to-rules`. To author a shareable pack: npx collab-swarm pack new <name>."));
     return 0;
   }
   for (const pack of packs) {
@@ -182,29 +170,32 @@ function runList(): number {
 /** Re-asks an attached pack's questions and re-applies everything they decide. */
 async function runOptions(args: Args): Promise<number> {
   const { config, root } = loadConfig();
+  const repo = flagString(args, 'repo');
+  const holder = packHolder(config, repo);
+  const where = repo === null ? '' : ` --repo ${repo}`;
   const spec = args.positional[1];
   if (!spec) {
     throw new CliError(
       'Name the attached pack whose answers to change.',
       64,
-      config.packs.length > 0
-        ? `Attached: ${config.packs.join(', ')}.`
-        : 'No packs are attached. Add one: npx collab-swarm add <pack>.',
+      holder.packs.length > 0
+        ? `Attached: ${holder.packs.join(', ')}.`
+        : `No packs are attached. Add one: npx collab-swarm add <pack>${where}.`,
     );
   }
-  if (!config.packs.includes(spec)) {
+  if (!holder.packs.includes(spec)) {
     throw new CliError(
-      `"${spec}" is not attached to this repository.`,
+      `"${spec}" is not attached to ${repo === null ? 'this repository' : repo}.`,
       1,
-      config.packs.length > 0
-        ? `Attached: ${config.packs.join(', ')}. Attach another with: npx collab-swarm add ${spec}`
-        : `Attach it first: npx collab-swarm add ${spec}`,
+      holder.packs.length > 0
+        ? `Attached: ${holder.packs.join(', ')}. Attach another with: npx collab-swarm add ${spec}${where}`
+        : `Attach it first: npx collab-swarm add ${spec}${where}`,
     );
   }
 
   const assumeYes = flagBool(args, 'yes') || flagBool(args, 'y');
   const preset = parseSelections(flagString(args, 'options') ?? '');
-  const recorded = config.packOptions[packName(locatePack(spec, root).dir)] ?? {};
+  const recorded = holder.packOptions[packName(locatePack(spec, root).dir)] ?? {};
   const current = resolvePack(spec, root, recorded);
   if (current.options.length === 0) {
     info(`${current.title} asks no questions, so there is nothing to change.`);
@@ -217,8 +208,8 @@ async function runOptions(args: Args): Promise<number> {
   heading(`${pack.title} ${style.dim(`(${pack.name})`)}`);
   describePack(pack);
 
-  record(config, spec, pack, answers);
-  config.checks.push(...(await offerChecks(config, pack, assumeYes)));
+  record(holder, spec, pack, answers);
+  holder.checks.push(...(await offerChecks(holder, pack, assumeYes)));
   writeText(join(root, CONFIG_FILE), serializeConfig(config));
 
   const plan = planSync(root, config, VERSION);

@@ -1,8 +1,10 @@
-# Stack pack format
+# Skill formats
 
-The anatomy of the four things a stack pack contains. Read this before writing any of them; `to-pack` owns the process, this file owns the shapes.
+The anatomy of the skills a rule set may carry — a concern skill, the rule that is its short form, a router, and a review skill — and of the same files inside a pack. Read the part you are about to write; [the rule set format](RULESET-FORMAT.md) says where each file goes, and `to-rules` owns the process.
 
-## Layout
+Most rule sets need none of this: rules and a stack profile carry the conventions, and a skill is written only for a concern whose work has an order a rule cannot hold.
+
+## Layout inside a pack
 
 ```text
 .collab-swarm/packs/<name>/
@@ -15,6 +17,8 @@ The anatomy of the four things a stack pack contains. Read this before writing a
 └── rules/
     └── <concern>.md
 ```
+
+In a rule set the same skills sit under `skills/`, and their role is the `role:` field of their front matter (`ticket` when absent) instead of a manifest entry. Name them after the repository — `api-queue-jobs`, not `queue-jobs` — because skills share one namespace across every repository the hub coordinates.
 
 `npx collab-swarm pack new` writes this shape with every file stubbed. Fill the stubs; never leave one with an empty `description`, because that is the line an agent reads to decide whether to open the skill at all.
 
@@ -275,7 +279,7 @@ A pack may describe the architecture it installs. It is rendered into `AGENTS.md
 
 `packages` is joined with the packages the chosen options bring in, de-duplicated by name. Declaring a package documents it; nothing is written to the project's dependency manifest, because adding a dependency is the agent's job when a ticket needs it.
 
-`detect` lists files whose presence suggests the pack, so `npx collab-swarm init` offers the matching one first:
+`detect` lists files whose presence suggests the pack. Nothing attaches it unasked: `npx collab-swarm rules` names it as a possible baseline for a repository that holds one of them and has no rule set yet:
 
 ```json
 "detect": ["pubspec.yaml"]

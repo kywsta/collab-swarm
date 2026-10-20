@@ -4,10 +4,11 @@ import { CONFIG_FILE, inRoot } from '../config.js';
 import type { PackSet } from '../packs.js';
 import { readPackFile, ticketSkills } from '../packs.js';
 import { unresolvedMarkers, unresolvedVars } from '../options.js';
-import { exists, listFiles, readTextOrNull } from '../util/fs.js';
+import { exists, listDirs, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
 import { historyFindings, historyPath } from './history.js';
 import { Register } from './register.js';
+import { RULES_ROOT, RULE_ORIGINS, ROOT_SCOPE, type RuleSet } from './rulesets.js';
 import {
   CHANGE_SECTIONS,
   CHANGE_STATUSES,
@@ -526,16 +527,49 @@ function checkRepositories(root: string, config: Config, findings: Findings): vo
   }
 }
 
+/**
+ * Rule sets: one directory per repository that exists, rules whose author is
+ * known, and globs written relative to the repository they govern — the
+ * repository's path is added on publishing, so writing it again doubles it.
+ */
+function checkRuleSets(root: string, config: Config, sets: RuleSet[], findings: Findings): void {
+  const known = new Set([ROOT_SCOPE, ...Object.keys(config.repositories)]);
+  for (const name of listDirs(join(root, RULES_ROOT))) {
+    if (known.has(name)) continue;
+    findings.warn(
+      join(root, RULES_ROOT, name),
+      `rule set "${name}" belongs to no repository; name it after one under repositories:, or "${ROOT_SCOPE}" for this one`,
+    );
+  }
+  for (const set of sets) {
+    for (const rule of set.rules) {
+      if (!(RULE_ORIGINS as readonly string[]).includes(rule.origin)) {
+        findings.error(rule.path, `origin "${rule.origin}" is not one of ${RULE_ORIGINS.join(', ')}`);
+      }
+      const prefix = set.scope.path === '' ? null : `${set.scope.path}/`;
+      if (prefix && rule.paths.some((glob) => glob.replace(/^\.\//, '').startsWith(prefix))) {
+        findings.warn(
+          rule.path,
+          `globs are relative to ${set.scope.path}, which is added when the rule is published; drop the leading "${prefix}"`,
+        );
+      }
+    }
+  }
+}
+
 /** Every plan under the configured plans root, plus the repository's own wiring. */
 export function validateRepository(
   root: string,
   config: Config,
-  packs: PackSet,
+  packs: PackSet & { conflicts?: string[]; ruleSets?: RuleSet[] },
   options: { plansOnly?: boolean } = {},
 ): Findings {
   const findings = new Findings(root);
 
   if (!options.plansOnly) {
+    for (const conflict of packs.conflicts ?? []) findings.error(join(root, CONFIG_FILE), conflict);
+    checkRuleSets(root, config, packs.ruleSets ?? [], findings);
+
     for (const [key, source] of Object.entries(config.sources)) {
       if (!source.required) continue;
       const hit = source.paths.some((pattern) => {

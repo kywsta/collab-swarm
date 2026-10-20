@@ -4,18 +4,21 @@ import { PROGRAM } from '../util/program.js';
 import { CONFIG_FILE, inRoot, loadConfig } from '../config.js';
 import { Git } from '../core/git.js';
 import { Repository } from '../core/repositories.js';
+import { ROOT_SCOPE, ruleSetStatus, scopes } from '../core/rulesets.js';
 import { listPlanDirs } from '../core/plan.js';
 import { validateRepository } from '../core/validate.js';
-import { bundledPacks, loadPacks, locatePack, packName } from '../packs.js';
+import { locatePack, packName } from '../packs.js';
+import { loadWorkspace } from '../workspace.js';
 import { unknownSelections } from '../options.js';
 import { planSync } from '../sync.js';
 import { exists } from '../util/fs.js';
 import { heading, out, style } from '../util/log.js';
 
-type Level = 'ok' | 'warn' | 'fail';
+type Level = 'ok' | 'info' | 'warn' | 'fail';
 
 const MARK: Record<Level, string> = {
   ok: style.green('✓'),
+  info: style.dim('·'),
   warn: style.yellow('!'),
   fail: style.red('✗'),
 };
@@ -60,24 +63,35 @@ export async function run(_args: Args): Promise<number> {
     }
   }
 
-  const packs = loadPacks(root, config.packs, config.packOptions);
+  const packs = loadWorkspace(root, config);
   say(
     'ok',
     `${packs.packs.length} pack(s): ${packs.packs.map((pack) => pack.name).join(', ')} · ` +
       `${packs.skills.length} skills, ${packs.rules.length} rules`,
   );
-  if (packs.packs.every((pack) => pack.core)) {
-    const suggestion = bundledPacks().find((pack) =>
-      pack.detect.some((file) => exists(join(root, file))),
-    );
-    say(
-      'warn',
-      "No skills for this project's stack",
-      suggestion
-        ? `Every agent implements from its own priors. This repository looks like ${suggestion.title}: npx collab-swarm add ${suggestion.name}`
-        : 'Every agent implements from its own priors. Ask yours to run the `to-pack` skill, or: npx collab-swarm add <pack>',
-    );
-  } else if (!packs.skills.some((skill) => skill.role === 'router')) {
+  // Rule sets are optional: the workflow runs without one. What doctor reports
+  // is a set that has fallen behind its repository, since agents then build by
+  // rules the code no longer follows.
+  const hub = Object.keys(config.repositories).length > 0;
+  for (const scope of scopes(config)) {
+    const status = ruleSetStatus(root, config, scope);
+    if (scope.name === ROOT_SCOPE && hub && status.verdict === 'none') continue;
+    const label = scope.name === ROOT_SCOPE ? 'This repository' : `"${scope.name}"`;
+    if (status.verdict === 'current') {
+      say('ok', `${label}: rule set current, researched ${status.recordedAt}`);
+    } else if (status.verdict === 'stale') {
+      say('warn', `${label}: rule set behind the code`, `See what moved: npx collab-swarm rules ${scope.name}, then research it again (the \`to-rules\` skill).`);
+    } else if (status.verdict === 'unrecorded') {
+      say('warn', `${label}: rule set never recorded`, `After researching it: npx collab-swarm rules ${scope.name} --record`);
+    } else if (status.verdict === 'none' || status.verdict === 'baseline') {
+      say(
+        'info',
+        `${label}: ${status.verdict === 'none' ? 'no rule set' : `pack baseline (${status.packs.join(', ')}) only`}`,
+        `Optional. Ask your agent to "research the rule set for ${scope.name === ROOT_SCOPE ? 'this repository' : scope.name}".`,
+      );
+    }
+  }
+  if (!packs.skills.some((skill) => skill.role === 'router')) {
     const concerns = packs.skills.filter((skill) => skill.role === 'ticket' && skill.pack !== 'core');
     if (concerns.length >= 4) {
       say(
@@ -88,25 +102,29 @@ export async function run(_args: Args): Promise<number> {
     }
   }
 
-  for (const spec of config.packs) {
-    const pack = packs.packs.find((candidate) => candidate.spec === spec);
-    if (!pack) continue;
-    const recorded = config.packOptions[packName(locatePack(spec, root).dir)] ?? {};
-    const stale = unknownSelections(pack.options, recorded);
-    if (stale.length > 0) {
-      say(
-        'warn',
-        `${pack.title} has ${stale.length} answer(s) it no longer offers: ${stale.join('; ')}`,
-        `The default was used instead. Re-answer them: npx collab-swarm pack options ${spec}`,
-      );
-    }
-    const unanswered = pack.options.filter((option) => recorded[option.id] === undefined);
-    if (unanswered.length > 0) {
-      say(
-        'warn',
-        `${pack.title} has ${unanswered.length} unanswered question(s): ${unanswered.map((option) => option.id).join(', ')}`,
-        `Defaults are in force and are not recorded, so an upgrade may change them: npx collab-swarm pack options ${spec}`,
-      );
+  for (const scope of scopes(config)) {
+    for (const spec of scope.packs) {
+      const repository = scope.name === ROOT_SCOPE ? undefined : scope.name;
+      const pack = packs.packs.find((candidate) => candidate.spec === spec && candidate.repository === repository);
+      if (!pack) continue;
+      const where = repository ? ` --repo ${repository}` : '';
+      const recorded = scope.packOptions[packName(locatePack(spec, root).dir)] ?? {};
+      const stale = unknownSelections(pack.options, recorded);
+      if (stale.length > 0) {
+        say(
+          'warn',
+          `${pack.title} has ${stale.length} answer(s) it no longer offers: ${stale.join('; ')}`,
+          `The default was used instead. Re-answer them: npx collab-swarm pack options ${spec}${where}`,
+        );
+      }
+      const unanswered = pack.options.filter((option) => recorded[option.id] === undefined);
+      if (unanswered.length > 0) {
+        say(
+          'warn',
+          `${pack.title} has ${unanswered.length} unanswered question(s): ${unanswered.map((option) => option.id).join(', ')}`,
+          `Defaults are in force and are not recorded, so an upgrade may change them: npx collab-swarm pack options ${spec}${where}`,
+        );
+      }
     }
   }
 
