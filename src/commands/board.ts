@@ -35,7 +35,7 @@ export function loadRegister(root: string, config: Config): Register {
 
 export function buildBoard(root: string, config: Config, options: { fetch?: boolean } = {}): Board {
   const register = loadRegister(root, config);
-  const claims = new Claims(root, config.git, config.plans).read(options);
+  const claims = new Claims(root, config.git, config.plans, config.repositories).read(options);
   return Board.build(register, claims, config.git.defaultBranch);
 }
 
@@ -60,6 +60,7 @@ export async function run(args: Args): Promise<number> {
             holder: row.claim?.holder ?? null,
             ref: row.claim?.ref ?? null,
             stage: row.claim?.stage ?? null,
+            repositories: row.claim?.repositories ?? [],
             blockers: row.blockers,
           })),
           proposals: board.proposals({ lane, count }).map((row) => row.row.slug),

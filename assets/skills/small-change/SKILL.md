@@ -40,7 +40,7 @@ Done when the user has confirmed the contract and said whether to record it.
 
 ## 3. Open the change
 
-Record the current Git SHA as the review base before any code change.
+Record the current Git SHA as the review base before any code change. In a [hub](../../workflow/WORKFLOW.md#code-repositories), a small change is made in one code repository: record that repository's SHA, and its name as `repository:` when the change is recorded; run its checks with `--repo <name>`.
 
 When the user chose to record, create `<plans>/<change-slug>/change.md` from the [change template](../../workflow/templates/change.md), with `status: in-progress` and the base SHA, and run `npx collab-swarm validate`. Use a readable kebab-case slug that names the outcome, not a sequence number. When the user chose not to, keep the contract and base SHA in the conversation.
 

@@ -22,6 +22,7 @@ import { asString, isSlug, readFrontMatter } from '../util/yaml.js';
 import type { Board } from './board.js';
 import { Git } from './git.js';
 import { changeFile, listPlanDirs, readPlan, readTickets } from './plan.js';
+import { repositoryHandles, unknownRepository, type Repository, type RepositoryProgress } from './repositories.js';
 import { cells, normalizeHeader, Register, SEPARATOR_ROW } from './register.js';
 
 export const HISTORY_FILE = 'HISTORY.md';
@@ -124,6 +125,9 @@ export const doneSlugs = (entries: HistoryEntry[]) =>
  *
  * - `ready`: complete, held by the default branch exactly as it is here, and
  *   waiting on nothing — it can be compacted.
+ * - `awaiting-code`: complete, but its branch has not merged in every code
+ *   repository the plan names; until it has, the plan is what keeps the row off
+ *   the done list, and compacting it would mark the row done early.
  * - `deferred-work`: complete, but a deferred ticket is still owed; compacting
  *   it would lose the only record of that work unless it is lifted first.
  * - `unmerged`: the default branch does not hold this directory as it is here,
@@ -132,7 +136,7 @@ export const doneSlugs = (entries: HistoryEntry[]) =>
  *   for weeks — probably abandoned or superseded, which is the user's call.
  * - `live`: work in progress; never compacted.
  */
-export type Verdict = 'ready' | 'deferred-work' | 'unmerged' | 'orphaned' | 'live';
+export type Verdict = 'ready' | 'awaiting-code' | 'deferred-work' | 'unmerged' | 'orphaned' | 'live';
 
 export interface Candidate {
   slug: string;
@@ -147,6 +151,8 @@ export interface Candidate {
   files: number;
   lines: number;
   deferred: { slug: string; title: string }[];
+  /** Code repositories the plan names whose branch has not merged yet. */
+  awaiting: RepositoryProgress[];
   verdict: Verdict;
 }
 
@@ -198,6 +204,7 @@ function readDirectory(
   ref: string | null,
   rows: Map<string, string>,
   now: Date,
+  handles: Map<string, Repository>,
 ): Candidate | null {
   const relDir = `${config.plans}/${slug}`;
   const dir = inRoot(root, relDir);
@@ -209,6 +216,7 @@ function readDirectory(
   let status: string;
   let complete: boolean;
   let deferred: Candidate['deferred'] = [];
+  let awaiting: RepositoryProgress[] = [];
 
   const change = readTextOrNull(changeFile(dir));
   if (change !== null) {
@@ -227,6 +235,16 @@ function readDirectory(
     deferred = readTickets(dir)
       .filter((ticket) => ticket.status === 'deferred')
       .map((ticket) => ({ slug: ticket.slug, title: ticket.title }));
+    if (complete) {
+      const branch = `${config.git.branchPrefix}${slug}`;
+      awaiting = plan.repositories
+        .map(
+          (repository) =>
+            handles.get(repository.name)?.progress(branch, repository.baseSha) ??
+            unknownRepository(repository.name),
+        )
+        .filter((progress) => progress.state !== 'merged');
+    }
   }
 
   let commit: string | null = null;
@@ -248,7 +266,13 @@ function readDirectory(
 
   let verdict: Verdict;
   if (complete) {
-    verdict = !held ? 'unmerged' : deferred.length > 0 ? 'deferred-work' : 'ready';
+    verdict = !held
+      ? 'unmerged'
+      : awaiting.length > 0
+        ? 'awaiting-code'
+        : deferred.length > 0
+          ? 'deferred-work'
+          : 'ready';
   } else if (held && idle && (kind === 'change' || !rows.has(slug))) {
     verdict = 'orphaned';
   } else {
@@ -266,6 +290,7 @@ function readDirectory(
     files: files.length,
     lines,
     deferred,
+    awaiting,
     verdict,
   };
 }
@@ -344,8 +369,9 @@ export function survey(
     (options.board?.rows ?? []).map((row) => [row.row.slug, row.row.milestone]),
   );
   const plansRoot = inRoot(root, config.plans);
+  const handles = repositoryHandles(root, config.repositories);
   const candidates = listPlanDirs(plansRoot)
-    .map((slug) => readDirectory(root, config, slug, git, ref, rows, now))
+    .map((slug) => readDirectory(root, config, slug, git, ref, rows, now, handles))
     .filter((candidate): candidate is Candidate => candidate !== null);
 
   const liveText = candidates

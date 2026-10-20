@@ -1,5 +1,7 @@
 import { style } from '../util/log.js';
 import type { Board, BoardRow } from './board.js';
+import { isComplete, unmerged } from './claims.js';
+import { describeProgress } from './repositories.js';
 
 const date = (at: Date) => at.toISOString().slice(0, 10);
 
@@ -16,6 +18,14 @@ const stageOf = (row: BoardRow): string => {
   const claim = row.claim;
   if (!claim || claim.stage === null) return 'no plan yet';
   return `stage ${claim.stage}${claim.status ? ` (${claim.status})` : ''}`;
+};
+
+/** Where the code stands in each repository, or `""` outside a hub. */
+const codeOf = (row: BoardRow): string => {
+  const repositories = row.claim?.repositories ?? [];
+  if (repositories.length === 0) return '';
+  const label = isComplete(row.claim!) && unmerged(row.claim!).length > 0 ? 'awaiting merge' : 'code';
+  return `${label}: ${repositories.map(describeProgress).join(', ')}`;
 };
 
 export interface RenderOptions {
@@ -94,7 +104,9 @@ export function renderStatus(board: Board, options: RenderOptions = {}): string 
     lines.push('', style.bold('In progress'));
     for (const row of pushed) {
       const claim = row.claim!;
-      const parts = [row.row.slug, row.row.lane, stageOf(row), claim.holder, claim.ref].filter(Boolean);
+      const parts = [row.row.slug, row.row.lane, stageOf(row), claim.holder, claim.ref, codeOf(row)].filter(
+        Boolean,
+      );
       if (claim.lastCommitAt) parts.push(`last commit ${ago(claim.lastCommitAt, now)}`);
       const stale = board.isStale(claim, now)
         ? ` · ${style.yellow(`stale: no commit since ${date(claim.lastCommitAt!)}`)}`
@@ -106,7 +118,8 @@ export function renderStatus(board: Board, options: RenderOptions = {}): string 
   if (unpushed.length > 0) {
     lines.push('', style.bold('Unpushed plans in this checkout (invisible to everyone else)'));
     for (const row of unpushed) {
-      lines.push(`- ${row.row.slug} · ${stageOf(row)} · push its branch to claim the row`);
+      const code = codeOf(row);
+      lines.push(`- ${row.row.slug} · ${stageOf(row)}${code ? ` · ${code}` : ''} · push its branch to claim the row`);
     }
   }
 

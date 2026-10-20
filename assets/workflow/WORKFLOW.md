@@ -8,7 +8,7 @@ It is deliberately language and framework agnostic. What the project uses, where
 
 ## Where features come from
 
-The backlog is one Markdown file — `backlog:` in `collab-swarm.yml` — holding the milestones, the feature register, the human gates and the decisions register. It is the swarm's queue: a row is claimed by a branch, done when its plan is complete on the default branch — or, once compacted, listed as delivered in the [history](#compacting-history) there — and never offered while a dependency, an open gate or an unanswered decision stands in its way. `to-backlog` writes and reorders it from the project's sources, ordered by dependency and cut so every lane has work; `whats-next` reads it.
+The backlog is one Markdown file — `backlog:` in `collab-swarm.yml` — holding the milestones, the feature register, the human gates and the decisions register. It is the swarm's queue: a row is claimed by a branch, done when its plan is complete on the default branch — or, once compacted, listed as delivered in the [history](#compacting-history) there — and, in a [hub](#code-repositories), once its code has merged in every repository the plan names; it is never offered while a dependency, an open gate or an unanswered decision stands in its way. `to-backlog` writes and reorders it from the project's sources, ordered by dependency and cut so every lane has work; `whats-next` reads it.
 
 A row is planned from the [sources](#sources-of-truth), so a capability no source describes is shaped before it is registered: `new-feature` researches what exists, interviews until the behaviour is settled, writes the product, design and API documents, and hands the rows to `to-backlog`. A change to behaviour a source already describes skips that and goes straight to a plan.
 
@@ -41,6 +41,19 @@ One feature plan lives at `<plans>/<feature-slug>/`, where `<plans>` is the `pla
 Use a short kebab-case feature slug. Reuse an existing open plan when it describes the same outcome. Create another plan only for a distinct outcome.
 
 `plan.yml` records where work should resume. `deliver-change` owns its stage and status and each ticket's status. The content skills own their Markdown files.
+
+## Code repositories
+
+Some projects keep their knowledge apart from their code. A **hub** repository holds the sources, the backlog and the plans; each application is a Git repository of its own — usually a submodule — with its own remote, default branch, CI and deployment. `repositories:` in `collab-swarm.yml` lists them, and the workflow keeps one board over all of them.
+
+- **One branch name everywhere.** A feature's branch is `<prefix><slug>` in the hub and in every repository its plan names. The hub's branch carries the plan and any document changes; each repository's branch carries that repository's code.
+- **The plan says where the work lands.** `plan.yml` lists the repositories the feature touches, each with the `base_sha` its branch was cut from: the review base in that repository, as `implementation_base_sha` is in the hub. A backlog row may name them in a `Repositories` column, so the claim opens their branches at once; the specification adds any it discovers with `npx collab-swarm repos <slug> --open <name>`.
+- **A ticket is built in one repository.** It names it with `repository:` whenever the plan lists more than one. Work that genuinely spans two repositories — an endpoint and the screen that calls it — is two tickets, the second depending on the first.
+- **Done needs the code merged.** A row is done when its plan is complete on the hub's default branch *and* its branch has merged into the default branch of every repository the plan names. Until then the board shows it awaiting merge, and nothing that depends on it is offered. A merged branch that was later deleted still counts when the default branch's merge commit names it; a squash merge must keep the branch name in its message, or keep the branch until the row shows done.
+- **A repository that is not checked out cannot be confirmed.** Merges are read from each repository's own remote, so a checkout without its submodules initialised shows such a row awaiting merge rather than guessing. `npx collab-swarm repos` lists what is checked out.
+- **Checks run where the code is.** Each repository has its own `checks:`, run from its own directory. A focus path inside a repository selects it; `--repo <name>` names it outright. Each repository's own CI keeps running its own pipeline and never needs the hub.
+
+`npx collab-swarm repos <slug>` shows where a feature's branch stands in each repository: open with commits not yet merged, merged, missing, or unreadable from here.
 
 ## Flow
 
@@ -142,9 +155,10 @@ npx collab-swarm check                       # full set
 npx collab-swarm check --focus <test path>   # ticket verification
 npx collab-swarm check --ci                  # verify formatting instead of rewriting it
 npx collab-swarm check --only test           # one named check
+npx collab-swarm check --repo api            # one coordinated repository's checks
 ```
 
-A ticket runs it with a focused test path; completion and cross-cutting work run the full set. `npx collab-swarm validate` checks the workflow contract and every plan, and belongs in the same set.
+A ticket runs it with a focused test path; completion and cross-cutting work run the full set. In a [hub](#code-repositories), the full set runs the hub's checks and then each repository's in its own directory, skipping — and saying so — any repository not checked out here; a focus path runs only the checks of the repository that holds it. `npx collab-swarm validate` checks the workflow contract and every plan, and belongs in the same set.
 
 ## Review and completion
 
@@ -157,7 +171,7 @@ Run every review-role skill an installed pack provides, for the surfaces that ch
 
 Blocking findings are correctness, security, privacy, data-loss, architecture, accessibility, requirement, or failing-check problems. Fix them before completion. Advisory findings may be reported as follow-up work.
 
-Completion requires every ticket done or deferred, no blocking review finding, generated sources current, and the full check set passing. Update the domain vocabulary, architecture decisions, routing instructions, or design system when the delivered change alters those contracts.
+Completion requires every ticket done or deferred, no blocking review finding, generated sources current, and the full check set passing. In a [hub](#code-repositories), the review covers each repository's diff from its own base, and the feature is delivered only when each repository's branch merges; the plan's completion reports the merge request each one still needs. Update the domain vocabulary, architecture decisions, routing instructions, or design system when the delivered change alters those contracts.
 
 ## Compacting history
 

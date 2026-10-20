@@ -11,6 +11,8 @@ Implement one ticket. `deliver-change` owns ticket status and feature-level revi
 
 Confirm the ticket is `in-progress`, its dependencies are `done`, and its named requirements, specification constraints, public test boundaries, and skills are clear. If a product decision is missing, return to `deliver-change`.
 
+In a [hub](../../workflow/WORKFLOW.md#code-repositories), the ticket's `repository` — or the plan's only one — is where the code goes. Work in that repository's directory from `collab-swarm.yml`, on the feature's branch: `git -C <path> switch <prefix><slug>` picks up the branch the claim opened. Its conventions, packs and instruction files are the ones that apply.
+
 Done when the ticket has one concrete outcome and no unresolved prerequisite.
 
 ## 2. Build in red-green slices
@@ -31,7 +33,7 @@ Run the [project checks](../../workflow/WORKFLOW.md#project-checks):
 npx collab-swarm check --focus <ticket test path>
 ```
 
-It runs the project's configured commands in order and validates the plan. Then inspect the diff for unrelated changes, hand-edited generated files, secrets, and missed documentation.
+It runs the project's configured commands in order and validates the plan. In a hub, a test path inside the repository runs that repository's checks from its own directory; `--repo <name> --focus <path relative to it>` says the same thing outright. Commit the code in that repository, on the feature's branch. Then inspect the diff for unrelated changes, hand-edited generated files, secrets, and missed documentation.
 
 Done when the ticket is production-ready, focused, and green.
 

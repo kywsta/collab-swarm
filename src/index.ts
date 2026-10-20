@@ -18,10 +18,19 @@ export {
   type Config,
   type GitConfig,
   type LoadedConfig,
+  type RepositoryConfig,
   type SourceConfig,
 } from './config.js';
 export { Board, normalizeLane, type BoardRow, type RowState } from './core/board.js';
-export { Claims, isComplete, type Claim, type ClaimOutcome } from './core/claims.js';
+export { Claims, isComplete, unmerged, type Claim, type ClaimOutcome } from './core/claims.js';
+export {
+  Repository,
+  describeProgress,
+  repositoryHandles,
+  type MergeState,
+  type OpenOutcome,
+  type RepositoryProgress,
+} from './core/repositories.js';
 export { Git } from './core/git.js';
 export {
   PLAN_STAGES,
@@ -37,6 +46,7 @@ export {
   serializePlan,
   writePlan,
   type Plan,
+  type PlanRepository,
   type PlanStage,
   type PlanStatus,
   type Ticket,
@@ -66,7 +76,7 @@ export {
   type StepMap,
   type StepMapOptions,
 } from './core/steps.js';
-export { Findings, validatePlan, validateRepository, type Finding } from './core/validate.js';
+export { Findings, validatePlan, validateRepository, type Finding, type PlanContext } from './core/validate.js';
 export {
   ROLE_LABEL,
   assetsDir,

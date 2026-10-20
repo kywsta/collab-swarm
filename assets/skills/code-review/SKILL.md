@@ -16,6 +16,8 @@ Both axes run as parallel read-only sub-agents so one concern does not mask the 
 
 For a feature plan, use `implementation_base_sha` from `plan.yml`. For a small change, use `base_sha` from its `change.md`, or the base `small-change` recorded in the conversation. In standalone use, use the ref supplied by the user or the feature branch's merge base. Review committed and tracked working-tree changes with `git diff <base>`, list commits with `git log <base>..HEAD --oneline`, and include untracked files reported by `git status --short`.
 
+In a [hub](../../workflow/WORKFLOW.md#code-repositories), a feature's diff is several: the hub's from `implementation_base_sha`, and each repository's from the `base_sha` its entry in `plan.yml` records, read with `git -C <path>` against that repository's feature branch. Both reviewers inspect all of them, and every finding names its repository. A recorded small change with a `repository:` is reviewed in that repository from its `base_sha`.
+
 Confirm the base resolves and the diff is non-empty.
 
 Done when both reviewers will inspect the same complete diff.

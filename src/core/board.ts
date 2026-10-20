@@ -5,7 +5,8 @@
  * agent sees the same board after one fetch.
  */
 
-import { isComplete, type Claim } from './claims.js';
+import { isComplete, unmerged, type Claim } from './claims.js';
+import { describeProgress } from './repositories.js';
 import { milestoneIndex, sizeIndex, type Register, type RegisterRow } from './register.js';
 
 export type RowState = 'done' | 'in-progress' | 'available' | 'blocked';
@@ -62,9 +63,14 @@ export class Board {
       }
     }
 
+    // A complete plan says the work is finished; in a hub, the code reaching
+    // each repository's default branch is what says it was delivered.
     const done = new Set(
       [...bySlug.values()]
-        .filter((claim) => isComplete(claim) && claim.ref.endsWith(`/${defaultBranch}`))
+        .filter(
+          (claim) =>
+            isComplete(claim) && claim.ref.endsWith(`/${defaultBranch}`) && unmerged(claim).length === 0,
+        )
         .map((claim) => claim.slug),
     );
 
@@ -131,6 +137,12 @@ export class Board {
           : `"${slug}" is already done (plan complete on ${row.claim?.ref ?? 'the default branch'}).`;
       case 'in-progress': {
         const claim = row.claim!;
+        if (isComplete(claim) && unmerged(claim).length > 0) {
+          return (
+            `"${slug}" is complete on ${claim.ref} and waiting for its code to merge: ` +
+            `${unmerged(claim).map(describeProgress).join('; ')}.`
+          );
+        }
         const where = claim.isPushed ? claim.ref : `${claim.ref} (unpushed plan in this checkout)`;
         return `"${slug}" is already claimed by ${claim.holder} on ${where}.`;
       }

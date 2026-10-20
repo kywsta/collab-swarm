@@ -19,6 +19,8 @@ Done when each ticket has a visible result and the set covers the complete featu
 
 Use ticket slugs in `depends_on`. Prefer a simple sequence. Add parallel branches only when tickets are truly independent. Reject cycles, horizontal layer batches, duplicate work, and oversized tickets.
 
+In a [hub](../../workflow/WORKFLOW.md#code-repositories), every ticket is built in one repository and says which with `repository:` whenever the plan lists more than one. A behaviour spanning two — an endpoint and the screen that calls it — is two tickets, the caller depending on the provider, and each ticket's `skills` come from the packs that cover its repository.
+
 Choose the smallest applicable skill list. Behavioural tickets normally include `tdd` plus the concern skills the slice touches. Run `npx collab-swarm packs` to see which skills a ticket may name: only those whose role is *implements a ticket*. Coordination skills and reference skills such as `codebase-design` and `domain-modeling` are read when needed, never listed here.
 
 Done when at least one ticket can start and every dependency represents a real implementation prerequisite.

@@ -24,6 +24,8 @@ export interface RegisterRow {
   gates: string[];
   /** Decision ids (`D6`) this row waits for. */
   decisions: string[];
+  /** Code repositories the row's work lands in, when the backlog lives in a hub. */
+  repositories: string[];
 }
 
 export interface Gate {
@@ -64,6 +66,7 @@ const COLUMNS: Record<keyof Omit<RegisterRow, 'gates' | 'decisions' | 'milestone
   lane: ['owner', 'lane', 'assignee', 'dev', 'who', 'team'],
   size: ['size', 'estimate', 'points', 'effort'],
   dependsOn: ['dependson', 'depends', 'dependencies', 'blockedby', 'waitson', 'needs'],
+  repositories: ['repositories', 'repository', 'repos', 'repo', 'codebases', 'codebase'],
 };
 
 /** Columns of the gate tracker and the decisions register. */
@@ -143,6 +146,16 @@ function readDecisionRow(
 }
 
 const ids = (text: string, pattern: RegExp) => [...text.matchAll(pattern)].map((match) => match[0]);
+
+/** `` `api`, `participant` `` or `api, participant`: names, in order, once each. */
+const repositoryNames = (cell: string): string[] => [
+  ...new Set(
+    cell
+      .split(/[,;\s]+/)
+      .map((name) => name.replace(/`/g, '').trim())
+      .filter((name) => /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/i.test(name)),
+  ),
+];
 
 export class Register {
   private constructor(
@@ -231,6 +244,7 @@ export class Register {
         dependsOn: [...depends.matchAll(BACKTICKED)].map((match) => match[1]!),
         gates: ids(depends, GATE_ID),
         decisions: ids(depends, DECISION_ID),
+        repositories: repositoryNames(at('repositories')),
       };
       if (/every (earlier|previous)|all (ui )?features/i.test(depends)) {
         everyEarlierMilestone.add(slug);

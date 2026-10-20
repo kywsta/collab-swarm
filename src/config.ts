@@ -34,13 +34,13 @@ export interface SourceConfig {
 
 export interface CheckConfig {
   name: string;
-  /** Shell command run from the repository root. */
+  /** Shell command run from the repository root, or a coordinated repository's own directory. */
   run: string;
-  /** Variant used by `check --focus <path>`; `{path}` is substituted. */
+  /** Variant used by `check --focus <path>`; `{path}` is substituted, relative to where it runs. */
   focus?: string;
   /** Variant used by `check --ci` (verify instead of rewrite). */
   ci?: string;
-  /** Skipped unless the named file or directory exists. */
+  /** Skipped unless the named file or directory exists where it runs. */
   when?: string;
 }
 
@@ -48,6 +48,27 @@ export interface GitConfig {
   remote: string;
   defaultBranch: string;
   branchPrefix: string;
+}
+
+/**
+ * A code repository this one coordinates: a submodule, or a sibling checkout.
+ *
+ * Used when this repository is a hub — it holds the knowledge, the backlog and
+ * the plans, while the code lands in repositories of its own. A feature's
+ * branch carries the same name in the hub and in every repository its plan
+ * touches, so one slug finds all of them.
+ */
+export interface RepositoryConfig {
+  /** Short kebab-case name plans and tickets use: `api`, `participant`. */
+  name: string;
+  /** Checkout directory, relative to this repository's root. */
+  path: string;
+  /** The remote its branches are pushed to; the hub's remote when unset. */
+  remote: string;
+  /** Where its features merge: often `develop` rather than the hub's `main`. */
+  defaultBranch: string;
+  /** Its own checks, run from its own directory. */
+  checks: CheckConfig[];
 }
 
 export interface Config {
@@ -64,6 +85,8 @@ export interface Config {
   sources: Record<string, SourceConfig>;
   checks: CheckConfig[];
   git: GitConfig;
+  /** Code repositories this hub coordinates, keyed by name; empty for a single repository. */
+  repositories: Record<string, RepositoryConfig>;
   /** Extra skill packs, as bundled names, npm package names, or paths relative to the root. */
   packs: string[];
   /**
@@ -93,6 +116,7 @@ export const DEFAULT_CONFIG: Config = {
   sources: {},
   checks: [],
   git: { remote: 'origin', defaultBranch: 'main', branchPrefix: 'feat/' },
+  repositories: {},
   packs: [],
   packOptions: {},
 };
@@ -156,10 +180,34 @@ function parseChecks(raw: unknown): CheckConfig[] {
   return checks;
 }
 
+function parseRepositories(raw: unknown, git: GitConfig): Record<string, RepositoryConfig> {
+  const dict = asDict(raw);
+  if (!dict) return {};
+  const repositories: Record<string, RepositoryConfig> = {};
+  for (const [name, value] of Object.entries(dict)) {
+    const entry = asDict(value);
+    const path = entry ? asString(entry.path) : null;
+    if (!entry || !path) continue;
+    repositories[name] = {
+      name,
+      path: path.replace(/\/+$/, ''),
+      remote: asString(entry.remote) ?? git.remote,
+      defaultBranch: asString(entry.defaultBranch) ?? git.defaultBranch,
+      checks: parseChecks(entry.checks),
+    };
+  }
+  return repositories;
+}
+
 export function parseConfig(text: string): Config {
   const raw = asDict(parseYaml(text));
   if (!raw) throw new CliError(`${CONFIG_FILE} must contain a YAML mapping.`);
   const git = asDict(raw.git) ?? {};
+  const gitConfig: GitConfig = {
+    remote: asString(git.remote) ?? DEFAULT_CONFIG.git.remote,
+    defaultBranch: asString(git.defaultBranch) ?? DEFAULT_CONFIG.git.defaultBranch,
+    branchPrefix: asString(git.branchPrefix) ?? DEFAULT_CONFIG.git.branchPrefix,
+  };
   return {
     version: typeof raw.version === 'number' ? raw.version : CONFIG_VERSION,
     project: asString(raw.project) ?? DEFAULT_CONFIG.project,
@@ -169,15 +217,20 @@ export function parseConfig(text: string): Config {
     lanes: asStringList(raw.lanes),
     sources: parseSources(raw.sources),
     checks: parseChecks(raw.checks),
-    git: {
-      remote: asString(git.remote) ?? DEFAULT_CONFIG.git.remote,
-      defaultBranch: asString(git.defaultBranch) ?? DEFAULT_CONFIG.git.defaultBranch,
-      branchPrefix: asString(git.branchPrefix) ?? DEFAULT_CONFIG.git.branchPrefix,
-    },
+    git: gitConfig,
+    repositories: parseRepositories(raw.repositories, gitConfig),
     packs: asStringList(raw.packs),
     packOptions: parsePackOptions(raw.packOptions),
   };
 }
+
+const serializeCheck = (check: CheckConfig): Dict => ({
+  name: check.name,
+  run: check.run,
+  ...(check.focus ? { focus: check.focus } : {}),
+  ...(check.ci ? { ci: check.ci } : {}),
+  ...(check.when ? { when: check.when } : {}),
+});
 
 export function serializeConfig(config: Config): string {
   const body: Dict = {
@@ -200,14 +253,22 @@ export function serializeConfig(config: Config): string {
       },
     ]),
   );
-  body.checks = config.checks.map((check) => ({
-    name: check.name,
-    run: check.run,
-    ...(check.focus ? { focus: check.focus } : {}),
-    ...(check.ci ? { ci: check.ci } : {}),
-    ...(check.when ? { when: check.when } : {}),
-  }));
+  body.checks = config.checks.map(serializeCheck);
   body.git = config.git;
+  const repositories = Object.values(config.repositories);
+  if (repositories.length) {
+    body.repositories = Object.fromEntries(
+      repositories.map((repository) => [
+        repository.name,
+        {
+          path: repository.path,
+          ...(repository.remote !== config.git.remote ? { remote: repository.remote } : {}),
+          defaultBranch: repository.defaultBranch,
+          checks: repository.checks.map(serializeCheck),
+        },
+      ]),
+    );
+  }
   if (config.packs.length) body.packs = config.packs;
   if (Object.keys(config.packOptions).length) body.packOptions = config.packOptions;
 

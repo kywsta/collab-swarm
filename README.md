@@ -157,6 +157,41 @@ sources:
 
 `owned: true` is what stops a service filing its own endpoint as a gate and waiting for itself: a gap in a contract you define is a ticket, a gap in one you consume is a gate with an owner, a stand-in, and one deferred ticket for the real connection. A service's interfaces are its operations and events, listed where an app lists its screens. A monorepo that owns both sides simply marks both.
 
+### A hub, with the code in other repositories
+
+Some programmes keep their knowledge apart from their code: one repository holds the requirements, the backlog and the plans, and each app is a repository of its own — usually a submodule — with its own remote, default branch, CI and deployment. Install collab-swarm in the hub and list the code repositories; `init` offers the hub's submodules, each with the default branch its remote advertises and the checks its own stack suggests.
+
+```yaml
+git: { remote: origin, defaultBranch: main, branchPrefix: "feat/" }
+repositories:
+  api:
+    path: repositories/api
+    defaultBranch: develop
+    checks:
+      - { name: format, run: "vendor/bin/pint", ci: "vendor/bin/pint --test" }
+      - { name: test, run: "php artisan test", focus: "php artisan test {path}" }
+  participant:
+    path: repositories/participant
+    defaultBranch: develop
+    checks:
+      - { name: test, run: "flutter test", focus: "flutter test {path}" }
+```
+
+There is still one backlog and one board. A row says where its code lands in a `Repositories` column, and a feature's branch has the same name everywhere:
+
+```console
+$ npx collab-swarm claim check-in-gate
+✓ Claimed "check-in-gate" on origin/feat/check-in-gate with .docs/changes/check-in-gate/plan.yml.
+  · api: opened origin/feat/check-in-gate from develop
+  · participant: opened origin/feat/check-in-gate from develop
+```
+
+- **The plan records where each branch started** — `repositories: { api: { base_sha: … } }` in `plan.yml` — which is that repository's review base. The specification adds a repository the row did not name with `npx collab-swarm repos <slug> --open <name>`.
+- **Every ticket names the repository it is built in** with `repository:` when the plan spans several, and its checks run there: `npx collab-swarm check --focus repositories/api/tests/Feature/CheckInTest.php` runs only the API's checks, from its own directory.
+- **Done needs the code merged.** A row is done when its plan is complete on the hub's default branch *and* its branch has merged in every repository the plan names. Until then `status` shows it awaiting merge — `awaiting merge: api merged, participant (2 commits not yet in develop)` — and nothing that depends on it is offered. A branch deleted after merging still counts when its merge commit names it; a squash merge must keep the branch name in its message. A repository that is not checked out cannot be confirmed, so it does not count as merged.
+
+`npx collab-swarm repos` lists the repositories and whether each is checked out here; `repos <slug>` shows where one feature's branch stands in each.
+
 ## Commands
 
 ```bash
@@ -172,15 +207,16 @@ npx collab-swarm steps [<skill>]         # what each skill does, step by step, a
 npx collab-swarm status [--lane <lane>]  # the board: done, in progress, available, blocked
 npx collab-swarm next [--lane <lane>]    # the best unclaimed rows, ranked
 npx collab-swarm claim <slug>            # take a row: pushes its branch with a plan skeleton
+npx collab-swarm repos [<slug>]          # a hub's code repositories, or one feature's branch in each
 npx collab-swarm plan <slug>             # scaffold a plan package by hand
 
 npx collab-swarm validate                # the workflow contract and every plan
 npx collab-swarm history                 # what has been delivered, and what can be compacted
-npx collab-swarm check [--focus <path>]  # your configured checks, in order
+npx collab-swarm check [--focus <path>]  # your configured checks, in order; --repo <name> for one code repository
 npx collab-swarm doctor                  # what is installed, stale, or missing
 ```
 
-`status`, `next`, `history`, `packs`, `steps` and `validate` accept `--json`.
+`status`, `next`, `repos`, `history`, `packs`, `steps` and `validate` accept `--json`.
 
 ## The backlog
 

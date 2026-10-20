@@ -78,6 +78,13 @@ export type ChangeStatus = (typeof CHANGE_STATUSES)[number];
 
 export const CHANGE_SECTIONS = ['What changes', 'Why', 'Acceptance criteria', 'Out of scope', 'Tests'];
 
+/** One code repository a feature lands in, and where its review starts there. */
+export interface PlanRepository {
+  name: string;
+  /** The default-branch commit the feature branch was cut from; null until it is opened. */
+  baseSha: string | null;
+}
+
 export interface Plan {
   schemaVersion: number;
   workflowVersion: number;
@@ -86,6 +93,8 @@ export interface Plan {
   stage: PlanStage;
   status: PlanStatus;
   implementationBaseSha: string | null;
+  /** The code repositories this feature touches, when the plans live in a hub. */
+  repositories: PlanRepository[];
   createdAt: string;
   updatedAt: string;
 }
@@ -97,6 +106,8 @@ export interface Ticket {
   status: TicketStatus;
   dependsOn: string[];
   skills: string[];
+  /** The repository the ticket is built in, when the plan names several. */
+  repository: string | null;
 }
 
 export const planFile = (planDir: string) => join(planDir, 'plan.yml');
@@ -106,6 +117,26 @@ export const ticketsDir = (planDir: string) => join(planDir, 'tickets');
 export const changeFile = (planDir: string) => join(planDir, 'change.md');
 
 export const stamp = (at: Date = new Date()) => at.toISOString().replace(/\.\d+/, '');
+
+/**
+ * `repositories:` as written in a plan: a mapping of name to `{ base_sha }`.
+ * A bare list of names is accepted too, for a plan written before any branch
+ * was opened.
+ */
+export function parsePlanRepositories(raw: unknown): PlanRepository[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((name) => asString(name))
+      .filter((name): name is string => name !== null)
+      .map((name) => ({ name, baseSha: null }));
+  }
+  const dict = asDict(raw);
+  if (!dict) return [];
+  return Object.entries(dict).map(([name, value]) => ({
+    name,
+    baseSha: asString(asDict(value)?.base_sha),
+  }));
+}
 
 export function readPlan(planDir: string): Plan | null {
   const text = readTextOrNull(planFile(planDir));
@@ -120,6 +151,7 @@ export function readPlan(planDir: string): Plan | null {
     stage: (asString(raw.stage) ?? '') as PlanStage,
     status: (asString(raw.status) ?? '') as PlanStatus,
     implementationBaseSha: asString(raw.implementation_base_sha),
+    repositories: parsePlanRepositories(raw.repositories),
     createdAt: asString(raw.created_at) ?? '',
     updatedAt: asString(raw.updated_at) ?? '',
   };
@@ -134,9 +166,15 @@ export function serializePlan(plan: Plan): string {
     stage: plan.stage,
     status: plan.status,
     implementation_base_sha: plan.implementationBaseSha,
-    created_at: plan.createdAt,
-    updated_at: plan.updatedAt,
   };
+  // Absent rather than empty, so a single-repository plan reads as it always has.
+  if (plan.repositories.length > 0) {
+    body.repositories = Object.fromEntries(
+      plan.repositories.map((repository) => [repository.name, { base_sha: repository.baseSha }]),
+    );
+  }
+  body.created_at = plan.createdAt;
+  body.updated_at = plan.updatedAt;
   return toYaml(body);
 }
 
@@ -145,7 +183,12 @@ export function writePlan(planDir: string, plan: Plan): void {
 }
 
 /** The skeleton a fresh claim pushes: a lone plan.yml at the requirements stage. */
-export function newPlan(slug: string, title: string, at: Date = new Date()): Plan {
+export function newPlan(
+  slug: string,
+  title: string,
+  at: Date = new Date(),
+  repositories: PlanRepository[] = [],
+): Plan {
   const now = stamp(at);
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -155,6 +198,7 @@ export function newPlan(slug: string, title: string, at: Date = new Date()): Pla
     stage: 'requirements',
     status: 'in-progress',
     implementationBaseSha: null,
+    repositories,
     createdAt: now,
     updatedAt: now,
   };
@@ -172,6 +216,7 @@ export function readTicket(file: string, slug: string): Ticket | null {
     status: (asString(front.data.status) ?? '') as TicketStatus,
     dependsOn: asStringList(front.data.depends_on),
     skills: asStringList(front.data.skills),
+    repository: asString(front.data.repository),
   };
 }
 

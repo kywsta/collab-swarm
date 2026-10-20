@@ -46,9 +46,16 @@ export class Git {
     return sha === null ? null : sha.trim();
   }
 
-  /** Tracked changes only: untracked plan drafts must not block a claim. */
+  /**
+   * Tracked changes only: untracked plan drafts must not block a claim. A
+   * submodule checked out at another commit is not a change either — in a hub
+   * that is simply a code repository on its feature branch, and a claim
+   * commits nothing but its own plan.
+   */
   get isDirty(): boolean {
-    return this.text(['status', '--porcelain', '--untracked-files=no']).trim() !== '';
+    return (
+      this.text(['status', '--porcelain', '--untracked-files=no', '--ignore-submodules=all']).trim() !== ''
+    );
   }
 
   fetch(remote: string): boolean {
