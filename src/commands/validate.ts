@@ -17,7 +17,7 @@ export async function run(args: Args): Promise<number> {
   if (target) {
     const dir = isAbsolute(target) ? target : resolve(process.cwd(), target);
     findings = new Findings(root);
-    validatePlan(dir, packs, findings);
+    validatePlan(dir, packs, findings, { repositories: config.repositories });
   } else {
     findings = validateRepository(root, config, packs);
   }

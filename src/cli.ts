@@ -85,10 +85,12 @@ ${style.bold('Deliver')}
   status [--lane <lane>]   The delivery board: done, in progress, available, blocked
   next [--lane <lane>]     The best unclaimed rows, ranked
   claim <slug>             Claim a row by pushing its branch with a plan skeleton
+  repos [<slug>] [--open]  The code repositories a hub coordinates, or one feature's branches in them
   plan <slug> [--title T]  Scaffold a feature plan package locally
   validate [<plan-dir>]    Check the workflow contract and every plan
   history                  What has been delivered, and what can be compacted
   check [--focus <path>]   Run the project's configured checks
+        [--repo <name>]    ...only those of one coordinated repository
 
 ${style.bold('Options')}
   --no-fetch               Read the board without contacting the remote
@@ -113,6 +115,8 @@ async function dispatch(args: Args): Promise<number> {
       return (await import('./commands/board.js')).run(args);
     case 'claim':
       return (await import('./commands/claim.js')).run(args);
+    case 'repos':
+      return (await import('./commands/repos.js')).run(args);
     case 'history':
       return (await import('./commands/history.js')).run(args);
     case 'plan':

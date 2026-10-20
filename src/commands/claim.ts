@@ -27,15 +27,16 @@ export async function run(args: Args): Promise<number> {
   }
 
   const title = row?.title || slug.replace(/-/g, ' ');
-  const claims = new Claims(root, config.git, config.plans);
+  const claims = new Claims(root, config.git, config.plans, config.repositories);
   // The board already fetched; a second fetch would only slow the claim down.
-  const result = claims.claim(slug, title, { fetch: false });
+  const result = claims.claim(slug, title, { fetch: false, repositories: row?.repositories ?? [] });
 
   if (!result.ok) {
     throw new CliError(result.message, 1);
   }
 
   ok(result.message);
+  for (const line of result.repositories ?? []) out(`  ${style.dim('·')} ${line}`);
   out('');
   out(`${style.bold('Next')}: ask your agent to`);
   out(

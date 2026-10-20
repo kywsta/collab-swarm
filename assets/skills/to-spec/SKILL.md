@@ -19,6 +19,8 @@ Prefer the deep modules and boundaries the codebase already has over new ones. R
 
 For an operation the requirements recorded as missing, map the types and the deterministic stand-in to the shape the feature will build against, including its error cases.
 
+In a [hub](../../workflow/WORKFLOW.md#code-repositories), read the code of each repository the feature may touch, and decide which of them it does touch. Name them under `Architecture and domain`, with what each one gains, and report them to `deliver-change`, which records them in `plan.yml`. A contract crossing two of them — the endpoint one serves and another calls — is designed once, here, for both sides.
+
 Decide only relevant concerns: domain rules and interfaces, data and integration mapping, the dependency graph and lifetimes, state and concurrency, failure behaviour, interface composition and interaction, security, observability, performance, accessibility, localization, compatibility, migration, and rollback.
 
 Consult `codebase-design` as a reference when a public interface remains genuinely unsettled; it is a vocabulary, not a stage. Use descriptive headings and names; do not create decision or seam numbers.

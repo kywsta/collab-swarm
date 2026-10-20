@@ -1,5 +1,5 @@
 import { basename, join, relative } from 'node:path';
-import type { Config } from '../config.js';
+import type { Config, RepositoryConfig } from '../config.js';
 import { CONFIG_FILE, inRoot } from '../config.js';
 import type { PackSet } from '../packs.js';
 import { readPackFile, ticketSkills } from '../packs.js';
@@ -7,6 +7,7 @@ import { unresolvedMarkers, unresolvedVars } from '../options.js';
 import { exists, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
 import { historyFindings, historyPath } from './history.js';
+import { Register } from './register.js';
 import {
   CHANGE_SECTIONS,
   CHANGE_STATUSES,
@@ -28,9 +29,18 @@ import {
   specificationFile,
   stageAtLeast,
   ticketsDir,
+  type Plan,
   type PlanStage,
   type Ticket,
 } from './plan.js';
+
+/** What a plan is checked against beyond its own files. */
+export interface PlanContext {
+  /** The code repositories the configuration coordinates. */
+  repositories?: Record<string, RepositoryConfig>;
+}
+
+const SHA = /^[0-9a-f]{7,64}$/;
 
 /**
  * Source kinds this repository writes by definition, whoever else reads them.
@@ -200,7 +210,12 @@ function checkTicketGraph(tickets: Ticket[], findings: Findings): void {
   }
 }
 
-function checkTicketFrontMatter(ticket: Ticket, allowed: string[], findings: Findings): void {
+function checkTicketFrontMatter(
+  ticket: Ticket,
+  allowed: string[],
+  planRepositories: string[],
+  findings: Findings,
+): void {
   const text = readTextOrNull(ticket.file);
   if (text === null) return;
   const front = readFrontMatter(text);
@@ -234,9 +249,30 @@ function checkTicketFrontMatter(ticket: Ticket, allowed: string[], findings: Fin
   }
 
   for (const key of Object.keys(front.data)) {
-    if (!['title', 'status', 'depends_on', 'skills'].includes(key)) {
+    if (!['title', 'status', 'depends_on', 'skills', 'repository'].includes(key)) {
       findings.error(ticket.file, `unexpected ticket field "${key}"`);
     }
+  }
+
+  // A ticket is built in one repository. With a single one there is nothing to
+  // choose; with several, an implementer must not have to guess.
+  if (ticket.repository !== null) {
+    if (planRepositories.length === 0) {
+      findings.error(
+        ticket.file,
+        `ticket names repository "${ticket.repository}", but the plan lists no repositories; add it to plan.yml or drop the field`,
+      );
+    } else if (!planRepositories.includes(ticket.repository)) {
+      findings.error(
+        ticket.file,
+        `ticket names repository "${ticket.repository}", which the plan does not list: ${planRepositories.join(', ')}`,
+      );
+    }
+  } else if (planRepositories.length > 1) {
+    findings.error(
+      ticket.file,
+      `the plan spans ${planRepositories.join(', ')}; name the one this ticket is built in with \`repository:\``,
+    );
   }
 
   if (ticket.status === 'deferred' && !/^## Deferred\s*$/m.test(text.replace(/\r\n/g, '\n'))) {
@@ -252,7 +288,7 @@ function checkTicketFrontMatter(ticket: Ticket, allowed: string[], findings: Fin
  * claim, so only its own shape is checked: who it is, where review starts, and
  * the contract the review is held to.
  */
-function validateChange(file: string, packs: PackSet, findings: Findings): void {
+function validateChange(file: string, packs: PackSet, findings: Findings, context: PlanContext): void {
   const text = readTextOrNull(file);
   if (text === null) return;
   const front = readFrontMatter(text);
@@ -260,7 +296,7 @@ function validateChange(file: string, packs: PackSet, findings: Findings): void 
     findings.error(file, 'YAML front matter is missing or unclosed');
     return;
   }
-  const { title, status, base_sha: sha } = front.data;
+  const { title, status, base_sha: sha, repository } = front.data;
   if (typeof title !== 'string' || title.trim() === '') {
     findings.error(file, 'title must be a non-empty string');
   }
@@ -270,8 +306,15 @@ function validateChange(file: string, packs: PackSet, findings: Findings): void 
   if (typeof sha !== 'string' || !/^[0-9a-f]{7,64}$/.test(sha)) {
     findings.error(file, 'base_sha must be the Git SHA recorded before the first code change, so review has a stable base');
   }
+  if (repository !== undefined) {
+    if (typeof repository !== 'string' || repository.trim() === '') {
+      findings.error(file, 'repository must name the coordinated repository the change is made in');
+    } else if (context.repositories && !context.repositories[repository]) {
+      findings.error(file, `repository "${repository}" is not under repositories: in ${CONFIG_FILE}`);
+    }
+  }
   for (const key of Object.keys(front.data)) {
-    if (!['title', 'status', 'base_sha'].includes(key)) {
+    if (!['title', 'status', 'base_sha', 'repository'].includes(key)) {
       findings.error(file, `unexpected change field "${key}"`);
     }
   }
@@ -281,7 +324,50 @@ function validateChange(file: string, packs: PackSet, findings: Findings): void 
   checkNotTemplate(file, templates === null ? null : join(templates, 'change.md'), CHANGE_SECTIONS, findings);
 }
 
-export function validatePlan(planDir: string, packs: PackSet, findings: Findings): void {
+/**
+ * The code repositories a plan names, against the ones the hub coordinates.
+ * Each needs a base from implementation onward, for the same reason the plan
+ * does: review in that repository starts there.
+ */
+function checkPlanRepositories(
+  planPath: string,
+  plan: Plan,
+  context: PlanContext,
+  findings: Findings,
+): void {
+  const seen = new Set<string>();
+  for (const repository of plan.repositories) {
+    if (seen.has(repository.name)) {
+      findings.error(planPath, `repository "${repository.name}" is listed twice`);
+    }
+    seen.add(repository.name);
+    if (context.repositories && !context.repositories[repository.name]) {
+      const known = Object.keys(context.repositories);
+      findings.error(
+        planPath,
+        `repository "${repository.name}" is not under repositories: in ${CONFIG_FILE}` +
+          (known.length > 0 ? ` (configured: ${known.join(', ')})` : ''),
+      );
+    }
+    if (repository.baseSha !== null && !SHA.test(repository.baseSha)) {
+      findings.error(planPath, `repositories.${repository.name}.base_sha is not a Git SHA`);
+    }
+    if (PLAN_STAGES.includes(plan.stage) && stageAtLeast(plan.stage, 'implementation') && repository.baseSha === null) {
+      findings.error(
+        planPath,
+        `repositories.${repository.name}.base_sha is required from the implementation stage onward, ` +
+          'so review in that repository has a stable base; open its branch with `npx collab-swarm repos <slug> --open`',
+      );
+    }
+  }
+}
+
+export function validatePlan(
+  planDir: string,
+  packs: PackSet,
+  findings: Findings,
+  context: PlanContext = {},
+): void {
   const feature = basename(planDir);
   if (!isSlug(feature)) {
     findings.error(planDir, `feature directory must be ${SLUG_HINT}`);
@@ -295,7 +381,7 @@ export function validatePlan(planDir: string, packs: PackSet, findings: Findings
       findings.error(change, 'a directory holds either a feature plan or a small change, not both');
       return;
     }
-    validateChange(change, packs, findings);
+    validateChange(change, packs, findings, context);
     return;
   }
   const plan = readPlan(planDir);
@@ -333,7 +419,8 @@ export function validatePlan(planDir: string, packs: PackSet, findings: Findings
   }
 
   const sha = plan.implementationBaseSha;
-  if (sha !== null && !/^[0-9a-f]{7,64}$/.test(sha)) {
+  checkPlanRepositories(planPath, plan, context, findings);
+  if (sha !== null && !SHA.test(sha)) {
     findings.error(planPath, 'implementation_base_sha is not a Git SHA');
   }
   if (stageOk && stageAtLeast(plan.stage, 'implementation') && sha === null) {
@@ -379,8 +466,9 @@ export function validatePlan(planDir: string, packs: PackSet, findings: Findings
     if (tickets.length === 0) {
       findings.error(ticketsDir(planDir), 'at least one ticket is required from the tickets stage onward');
     }
+    const planRepositories = plan.repositories.map((repository) => repository.name);
     for (const ticket of tickets) {
-      checkTicketFrontMatter(ticket, allowed, findings);
+      checkTicketFrontMatter(ticket, allowed, planRepositories, findings);
       checkSections(ticket.file, TICKET_SECTIONS, findings);
       checkNoPlaceholders(ticket.file, findings);
       checkNotTemplate(ticket.file, template('ticket.md'), TICKET_SECTIONS, findings);
@@ -393,6 +481,47 @@ export function validatePlan(planDir: string, packs: PackSet, findings: Findings
     findings.error(
       planPath,
       `every ticket must be done or deferred before feature review; open: ${open.join(', ')}`,
+    );
+  }
+}
+
+/**
+ * The coordinated repositories: names a branch and a plan can carry, one
+ * checkout each, and a backlog that names only repositories that exist.
+ * A repository that is not checked out is fine — the hub's own CI rarely
+ * initialises submodules — so only the configuration is judged here.
+ */
+function checkRepositories(root: string, config: Config, findings: Findings): void {
+  const file = join(root, CONFIG_FILE);
+  const repositories = Object.values(config.repositories);
+  const paths = new Map<string, string>();
+  for (const repository of repositories) {
+    if (!isSlug(repository.name)) {
+      findings.error(file, `repository name "${repository.name}" must be ${SLUG_HINT}; plans and tickets refer to it`);
+    }
+    const other = paths.get(repository.path);
+    if (other) {
+      findings.error(file, `repositories "${other}" and "${repository.name}" share the path ${repository.path}`);
+    }
+    paths.set(repository.path, repository.name);
+    if (repository.checks.length === 0) {
+      findings.warn(
+        file,
+        `repository "${repository.name}" has no checks, so a ticket built there is verified by nothing; add them under its \`checks:\``,
+      );
+    }
+  }
+
+  if (!config.backlog) return;
+  const backlog = readTextOrNull(inRoot(root, config.backlog));
+  if (backlog === null) return;
+  for (const row of Register.parse(backlog).rows) {
+    const unknown = row.repositories.filter((name) => !config.repositories[name]);
+    if (unknown.length === 0) continue;
+    findings.error(
+      inRoot(root, config.backlog),
+      `row "${row.slug}" names repositor${unknown.length === 1 ? 'y' : 'ies'} ${unknown.map((name) => `"${name}"`).join(', ')} ` +
+        `that ${CONFIG_FILE} does not list under repositories:`,
     );
   }
 }
@@ -439,6 +568,8 @@ export function validateRepository(
     if (config.backlog && !exists(inRoot(root, config.backlog))) {
       findings.warn(config.backlog, 'the configured backlog file does not exist, so the board has no register to read');
     }
+
+    checkRepositories(root, config, findings);
 
     // An unscoped rule is loaded into every agent turn, which is almost never
     // what a pack meant: a rule earns its place by being narrow.
@@ -489,7 +620,7 @@ export function validateRepository(
 
   const plansRoot = inRoot(root, config.plans);
   for (const dir of listPlanDirs(plansRoot)) {
-    validatePlan(join(plansRoot, dir), packs, findings);
+    validatePlan(join(plansRoot, dir), packs, findings, { repositories: config.repositories });
   }
 
   const history = inRoot(root, historyPath(config.plans));

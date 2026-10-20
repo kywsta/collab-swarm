@@ -4,6 +4,7 @@ import type { Board } from '../core/board.js';
 import { survey, type Candidate, type Survey } from '../core/history.js';
 import { CliError, out, style } from '../util/log.js';
 import { buildBoard } from './board.js';
+import { describeProgress } from '../core/repositories.js';
 
 const date = (at: Date | null) => (at ? at.toISOString().slice(0, 10) : 'never committed');
 
@@ -49,6 +50,15 @@ function render(result: Survey, board: Board | null, compactCommand: string): st
     const total = ready.reduce((sum, c) => sum + c.lines, 0);
     lines.push('', style.bold(`Ready to compact · ${plural(ready.length, 'directory')}, ${plural(total, 'line')}`));
     lines.push(...ready.map((candidate) => describe(candidate, board)));
+  }
+
+  const awaiting = by('awaiting-code');
+  if (awaiting.length > 0) {
+    lines.push('', style.bold('Complete, but the code has not merged everywhere — the plan keeps the row off the done list until it has'));
+    for (const candidate of awaiting) {
+      lines.push(describe(candidate, board));
+      for (const repository of candidate.awaiting) lines.push(`    ${describeProgress(repository)}`);
+    }
   }
 
   const deferred = by('deferred-work');

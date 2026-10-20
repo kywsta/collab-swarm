@@ -8,6 +8,7 @@ import {
   serializeConfig,
   type CheckConfig,
   type Config,
+  type RepositoryConfig,
   type SourceConfig,
 } from '../config.js';
 import { Git } from '../core/git.js';
@@ -24,6 +25,15 @@ import { isSlug, slugify } from '../util/yaml.js';
 
 /** Check suggestions per ecosystem, used only to prefill the config. */
 const ECOSYSTEMS: { when: string; name: string; checks: CheckConfig[] }[] = [
+  {
+    // Before Node: a Laravel application carries a package.json for its assets.
+    when: 'artisan',
+    name: 'Laravel',
+    checks: [
+      { name: 'format', run: 'vendor/bin/pint', ci: 'vendor/bin/pint --test' },
+      { name: 'test', run: 'php artisan test', focus: 'php artisan test {path}' },
+    ],
+  },
   {
     when: 'package.json',
     name: 'Node',
@@ -141,9 +151,24 @@ const SOURCE_CANDIDATES: {
 
 function detectChecks(root: string): { name: string; checks: CheckConfig[] } | null {
   for (const ecosystem of ECOSYSTEMS) {
-    if (exists(join(root, ecosystem.when))) return { name: ecosystem.name, checks: ecosystem.checks };
+    if (!exists(join(root, ecosystem.when))) continue;
+    return { name: ecosystem.name, checks: ecosystem.name === 'Node' ? nodeChecks(root, ecosystem.checks) : ecosystem.checks };
   }
   return null;
+}
+
+/**
+ * `npm test` fails outright when there is no test script, unlike the
+ * `--if-present` runs around it, so it is offered only to a package that has one.
+ */
+function nodeChecks(root: string, checks: CheckConfig[]): CheckConfig[] {
+  let scripts: Record<string, unknown> = {};
+  try {
+    scripts = JSON.parse(readTextOrNull(join(root, 'package.json')) ?? '{}').scripts ?? {};
+  } catch {
+    return checks;
+  }
+  return checks.filter((check) => check.name !== 'test' || typeof scripts.test === 'string');
 }
 
 function detectSources(root: string): Record<string, SourceConfig> {
@@ -215,6 +240,44 @@ async function askOwnership(
   }
 }
 
+/**
+ * The submodules of a hub, offered as the code repositories it coordinates.
+ *
+ * Each gets the checks its own ecosystem suggests and the default branch its
+ * remote advertises, so a hub whose apps integrate on `develop` while the hub
+ * itself uses `main` is configured correctly without being asked.
+ */
+function detectRepositories(root: string, hubBranch: string): RepositoryConfig[] {
+  if (!exists(join(root, '.gitmodules'))) return [];
+  const listing = new Git(root).text([
+    'config',
+    '--file',
+    '.gitmodules',
+    '--get-regexp',
+    '^submodule\\..*\\.path$',
+  ]);
+  const taken = new Set<string>();
+  const repositories: RepositoryConfig[] = [];
+  for (const line of listing.split('\n')) {
+    const path = line.trim().split(/\s+/)[1];
+    if (!path) continue;
+    let name = slugify(path.split('/').pop() ?? path) || 'repository';
+    while (taken.has(name)) name = `${name}-${taken.size + 1}`;
+    taken.add(name);
+    const dir = join(root, path);
+    const git = new Git(dir);
+    const own = exists(join(dir, '.git'));
+    repositories.push({
+      name,
+      path,
+      remote: 'origin',
+      defaultBranch: own ? detectDefaultBranch(git) : hubBranch,
+      checks: detectChecks(dir)?.checks ?? [],
+    });
+  }
+  return repositories;
+}
+
 function detectDefaultBranch(git: Git): string {
   const head = git.text(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']).trim();
   if (head.includes('/')) return head.split('/').pop()!;
@@ -280,9 +343,6 @@ export async function run(args: Args): Promise<number> {
       assumeYes || (await confirm(`\nDetected a ${detected.name} project. Use its usual checks?`, true));
     if (accept) checks = detected.checks;
   }
-  if (checks.length === 0) {
-    info('No checks configured yet. Add them under `checks:` in collab-swarm.yml — every agent will run them.');
-  }
 
   const sources = detectSources(root);
   if (Object.keys(sources).length > 0) {
@@ -293,6 +353,37 @@ export async function run(args: Args): Promise<number> {
         .join(', ')}. Agents will ground plans in them.`,
     );
     await askOwnership(sources, args, assumeYes);
+  }
+
+  const hubBranch = git.available ? detectDefaultBranch(git) : 'main';
+  const found = detectRepositories(root, hubBranch);
+  let repositories: RepositoryConfig[] = [];
+  if (found.length > 0) {
+    out('');
+    info(
+      `Found ${found.length} submodule${found.length === 1 ? '' : 's'}: ` +
+        found.map((repository) => `${repository.path} (${repository.defaultBranch})`).join(', ') +
+        '.',
+    );
+    const coordinate =
+      assumeYes ||
+      (await confirm(
+        'Is this a hub — sources and plans here, code in the submodules? Coordinate them as its code repositories?',
+        true,
+      ));
+    if (coordinate) {
+      repositories = found;
+      for (const repository of repositories.filter((candidate) => candidate.checks.length === 0)) {
+        info(`No checks detected for ${repository.name}; add them under repositories.${repository.name}.checks.`);
+      }
+      // A hub holds documents and plans; checking them is its whole check set
+      // until the team adds more.
+      if (checks.length === 0) checks = [{ name: 'validate', run: 'npx collab-swarm validate' }];
+    }
+  }
+
+  if (checks.length === 0) {
+    info('No checks configured yet. Add them under `checks:` in collab-swarm.yml — every agent will run them.');
   }
 
   const backlogPath = 'docs/delivery-plan.md';
@@ -310,9 +401,10 @@ export async function run(args: Args): Promise<number> {
     checks,
     git: {
       remote: 'origin',
-      defaultBranch: git.available ? detectDefaultBranch(git) : 'main',
+      defaultBranch: hubBranch,
       branchPrefix: 'feat/',
     },
+    repositories: Object.fromEntries(repositories.map((repository) => [repository.name, repository])),
   };
 
   const stack = await chooseStackSkills(root, config, args, assumeYes);
@@ -587,10 +679,37 @@ function backlogSeed(config: Config): string {
   const template = join(core.dir, 'workflow', 'templates', 'backlog.md');
   const text = readTextOrNull(template);
   if (text === null) return `# ${config.project} delivery plan\n`;
-  return text
+  const seeded = text
     .replaceAll('{{project}}', config.project)
     .replaceAll('{{branchPrefix}}', config.git.branchPrefix)
     .replaceAll('{{remote}}', config.git.remote)
     .replaceAll('{{defaultBranch}}', config.git.defaultBranch)
     .replaceAll('{{plans}}', config.plans);
+  const names = Object.keys(config.repositories);
+  return names.length > 0 ? withRepositories(seeded, names) : seeded;
+}
+
+/**
+ * A hub's backlog says where each row's code lands, so its claim can open the
+ * branches at once, and says that done waits for that code to merge.
+ */
+function withRepositories(backlog: string, names: string[]): string {
+  const lines: string[] = [];
+  let inRegister = false;
+  for (const line of backlog.split('\n')) {
+    if (/^\| Slug \| Title \|/.test(line)) {
+      inRegister = true;
+      lines.push(`${line} Repositories |`);
+      continue;
+    }
+    if (inRegister && line.startsWith('|')) {
+      lines.push(/^\|[\s|-]+\|$/.test(line) ? `${line} --- |` : `${line} \`${names[0]}\` |`);
+      continue;
+    }
+    inRegister = false;
+    lines.push(line.startsWith('- A row is **done** when')
+      ? `${line.replace(/\.$/, '')}, and its branch has merged in every code repository its plan names.`
+      : line);
+  }
+  return lines.join('\n');
 }

@@ -31,6 +31,18 @@ Stages are `requirements`, `specification`, `tickets`, `implementation`, `review
 
 `ready` means the complete plan is waiting for the user's implementation instruction. Set `implementation_base_sha` when implementation starts so a resumed review has a stable Git baseline. It is internal resume state, not something the user approves.
 
+In a [hub](WORKFLOW.md#code-repositories), the plan also lists the code repositories the feature touches, each with the commit its branch was cut from:
+
+```yaml
+repositories:
+  api:
+    base_sha: d1d1d44c010e
+  participant:
+    base_sha: null
+```
+
+Names are the keys under `repositories:` in `collab-swarm.yml`. `npx collab-swarm claim` and `npx collab-swarm repos <slug> --open` push the branch and record its base; a base is `null` only until then, and every listed repository needs one from the implementation stage onward. A plan in a single repository omits the key.
+
 ## Requirements
 
 `requirements.md` contains:
@@ -64,6 +76,8 @@ Ticket filenames and dependency values are kebab-case slugs. Ticket statuses are
 
 `skills` lists only skills whose role is *implements a ticket*. Run `npx collab-swarm packs` to see them; the validator rejects anything else.
 
+In a [hub](WORKFLOW.md#code-repositories), `repository: api` names the repository the ticket is built in. It is required when the plan lists more than one, optional when it lists one, and must be one the plan lists.
+
 ## Small change
 
 A recorded [small change](WORKFLOW.md#small-changes) is one file in place of a plan, `<plans>/<change-slug>/change.md`, seeded from `templates/change.md`:
@@ -76,7 +90,7 @@ base_sha: 1a2b3c4d
 ---
 ```
 
-Statuses are `in-progress` and `complete`. `base_sha` is the Git SHA recorded before the first code change. The body contains `What changes`, `Why`, `Acceptance criteria`, `Out of scope`, and `Tests`; `None.` is a complete answer for `Out of scope`. A directory holds a `change.md` or a `plan.yml`, never both. An unrecorded small change writes no file.
+Statuses are `in-progress` and `complete`. `base_sha` is the Git SHA recorded before the first code change. In a [hub](WORKFLOW.md#code-repositories), a change made in a code repository adds `repository: <name>`, and its `base_sha` is that repository's commit. The body contains `What changes`, `Why`, `Acceptance criteria`, `Out of scope`, and `Tests`; `None.` is a complete answer for `Out of scope`. A directory holds a `change.md` or a `plan.yml`, never both. An unrecorded small change writes no file.
 
 ## Delivery history
 

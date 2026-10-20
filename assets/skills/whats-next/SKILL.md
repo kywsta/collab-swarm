@@ -22,7 +22,7 @@ npx collab-swarm next --lane "Dev 2" # "What's next?" — only the top three, th
 
 Both fetch the remote with prune first; add `--no-fetch` offline. Pass `--lane` when the user names their lane ("I'm Dev 2", "I'm on backend"); otherwise leave it out and each proposal shows its own lane.
 
-The tool derives every row's state: **done** (plan complete on the default branch, or compacted into the delivery history), **in progress** (a claim branch on the remote, with holder and plan stage), **available**, or **blocked** (a dependency not done, a gate whose tracker status is open, or a decision with neither an answer nor a working assumption). Proposals are ranked by earliest milestone, the named lane, most rows unblocked, then size.
+The tool derives every row's state: **done** (plan complete on the default branch, or compacted into the delivery history — and, in a [hub](../../workflow/WORKFLOW.md#code-repositories), its branch merged in every code repository the plan names), **in progress** (a claim branch on the remote, with holder and plan stage), **available**, or **blocked** (a dependency not done, a gate whose tracker status is open, or a decision with neither an answer nor a working assumption). Proposals are ranked by earliest milestone, the named lane, most rows unblocked, then size.
 
 Done when the command has run and its output is in hand. If it fails, report the error verbatim; do not reconstruct the board by hand. When the project has no backlog file yet, or its register holds no rows, say so and offer `to-backlog`, which writes one from the project's sources.
 
@@ -47,8 +47,8 @@ When the user picks a row ("start 2", "let's do guest-home", "I'll take it"), th
 npx collab-swarm claim <slug>
 ```
 
-The tool re-fetches, refuses a row that is claimed, done, blocked, or unknown (relay its reason and offer the next proposal), creates the claim branch from the default branch, commits the plan skeleton at stage `requirements`, and pushes. A rejected push means another developer won the race: the tool restores the checkout and names the winner.
+The tool re-fetches, refuses a row that is claimed, done, blocked, or unknown (relay its reason and offer the next proposal), creates the claim branch from the default branch, commits the plan skeleton at stage `requirements`, and pushes. In a hub, it first pushes the same branch in each repository the row's `Repositories` cell names, without changing their checkouts, and records each one's base in the plan; relay any repository it could not reach and the command that finishes the job. A rejected push means another developer won the race: the tool restores the checkout and names the winner.
 
 On success the checkout is on the claim branch, and this session now belongs to that one feature: give it the row's [session name](../../workflow/WORKFLOW.md#session-name) using whatever the host offers for titling the current session, and move on without comment whether it worked or the host has no such control. Hand off to `deliver-change` with the feature's title and the sources cell from its register row; it resumes the plan the claim created. Start `deliver-change` in the same turn when the user asked to begin work, not only to claim.
 
-Done is automatic: merging the pull request puts the complete plan on the default branch, and the next fetch shows the row as done.
+Done is automatic: merging the pull request puts the complete plan on the default branch, and the next fetch shows the row as done. In a hub the code's merge requests count too: a complete plan whose code has not merged everywhere shows as awaiting merge, with the repositories it waits for.

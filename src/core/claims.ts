@@ -4,17 +4,25 @@
  * A claim is the branch `<prefix><slug>` on the remote carrying
  * `<plans>/<slug>/plan.yml`. Done is that plan complete on the default branch,
  * or — once the plan has been compacted — its row in `<plans>/HISTORY.md` there.
- * No tracker outside Git is consulted or written, so every developer and every
- * agent sees the same board after one fetch.
+ * In a hub, the plan names the code repositories it touches, and done also
+ * needs the same branch merged in each of them. No tracker outside Git is
+ * consulted or written, so every developer and every agent sees the same board
+ * after one fetch.
  */
 
 import { join } from 'node:path';
-import type { GitConfig } from '../config.js';
+import type { GitConfig, RepositoryConfig } from '../config.js';
 import { exists, listDirs, readText, writeText } from '../util/fs.js';
 import { asDict, asString, isSlug, parseYaml } from '../util/yaml.js';
 import { Git } from './git.js';
 import { countsAsDone, historyAt } from './history.js';
-import { newPlan, serializePlan } from './plan.js';
+import { newPlan, parsePlanRepositories, serializePlan, type PlanRepository } from './plan.js';
+import {
+  repositoryHandles,
+  unknownRepository,
+  type Repository,
+  type RepositoryProgress,
+} from './repositories.js';
 
 export interface Claim {
   slug: string;
@@ -28,25 +36,66 @@ export interface Claim {
   isPushed: boolean;
   /** Done through a row in the delivery history; the plan directory is gone. */
   compacted?: boolean;
+  /** Where the feature's branch stands in each code repository its plan names; absent outside a hub. */
+  repositories?: RepositoryProgress[];
 }
 
 export const isComplete = (claim: Claim) => claim.status === 'complete';
+
+/** Repositories the plan names whose branch has not merged yet. */
+export const unmerged = (claim: Claim): RepositoryProgress[] =>
+  (claim.repositories ?? []).filter((repository) => repository.state !== 'merged');
 
 export interface ClaimOutcome {
   ok: boolean;
   message: string;
   branch?: string;
+  /** One line per code repository the claim opened a branch in, or could not. */
+  repositories?: string[];
 }
+
+interface PlanState {
+  stage: string | null;
+  status: string | null;
+  repositories: PlanRepository[];
+}
+
+const readPlanState = (text: string): PlanState | null => {
+  try {
+    const plan = asDict(parseYaml(text));
+    return plan
+      ? {
+          stage: asString(plan.stage),
+          status: asString(plan.status),
+          repositories: parsePlanRepositories(plan.repositories),
+        }
+      : null;
+  } catch {
+    return null;
+  }
+};
 
 export class Claims {
   private readonly git: Git;
+  private readonly handles: Map<string, Repository>;
 
   constructor(
     private readonly root: string,
     private readonly git_config: GitConfig,
     private readonly plansDir: string,
+    repositories: Record<string, RepositoryConfig> = {},
   ) {
     this.git = new Git(root);
+    this.handles = repositoryHandles(root, repositories);
+  }
+
+  private progress(slug: string, repositories: PlanRepository[]): RepositoryProgress[] {
+    const branch = this.branchOf(slug);
+    return repositories.map(
+      (repository) =>
+        this.handles.get(repository.name)?.progress(branch, repository.baseSha) ??
+        unknownRepository(repository.name),
+    );
   }
 
   private planPath(slug: string) {
@@ -63,6 +112,11 @@ export class Claims {
 
   /** Every claim Git knows about, after at most one fetch. */
   read(options: { fetch?: boolean } = {}): Claim[] {
+    if (options.fetch !== false) {
+      for (const repository of this.handles.values()) {
+        if (repository.checkedOut) repository.fetch();
+      }
+    }
     if (!this.git.available) return this.localClaims(new Set());
     if (options.fetch !== false && this.git.hasRemote(this.git_config.remote)) {
       this.git.fetch(this.git_config.remote);
@@ -74,15 +128,9 @@ export class Claims {
     return [...claims, ...compacted, ...this.localClaims(known)];
   }
 
-  private planAt(ref: string, slug: string): { stage: string | null; status: string | null } | null {
+  private planAt(ref: string, slug: string): PlanState | null {
     const content = this.git.show(ref, this.planPath(slug));
-    if (content === null) return null;
-    try {
-      const plan = asDict(parseYaml(content));
-      return plan ? { stage: asString(plan.stage), status: asString(plan.status) } : null;
-    } catch {
-      return null;
-    }
+    return content === null ? null : readPlanState(content);
   }
 
   private branchClaims(): Claim[] {
@@ -108,6 +156,7 @@ export class Claims {
         status: plan?.status ?? null,
         lastCommitAt: parts[2] ? new Date(parts[2]) : null,
         isPushed: true,
+        repositories: this.progress(slug, plan?.repositories ?? []),
       });
     }
     return claims;
@@ -136,6 +185,7 @@ export class Claims {
         status: plan.status,
         lastCommitAt: last[1] ? new Date(last[1]) : null,
         isPushed: true,
+        repositories: this.progress(slug, plan.repositories),
       });
     }
     return claims;
@@ -160,6 +210,7 @@ export class Claims {
         lastCommitAt: null,
         isPushed: true,
         compacted: true,
+        repositories: [],
       }));
   }
 
@@ -173,15 +224,16 @@ export class Claims {
       if (known.has(slug) || !isSlug(slug)) continue;
       const file = join(dir, slug, 'plan.yml');
       if (!exists(file)) continue;
-      const plan = asDict(parseYaml(readText(file)));
+      const plan = readPlanState(readText(file));
       claims.push({
         slug,
         holder,
         ref: 'local',
-        stage: plan ? asString(plan.stage) : null,
-        status: plan ? asString(plan.status) : null,
+        stage: plan?.stage ?? null,
+        status: plan?.status ?? null,
         lastCommitAt: null,
         isPushed: false,
+        repositories: this.progress(slug, plan?.repositories ?? []),
       });
     }
     return claims;
@@ -195,11 +247,47 @@ export class Claims {
   }
 
   /**
+   * Opens the feature's branch in each named code repository, recording where
+   * each one starts. A repository that cannot be opened from here is still
+   * recorded, with no base, so the plan says where the work belongs and
+   * `repos <slug> --open` can finish the job.
+   */
+  openRepositories(
+    slug: string,
+    names: string[],
+    options: { fetch?: boolean } = {},
+  ): { repositories: PlanRepository[]; lines: string[] } {
+    const branch = this.branchOf(slug);
+    const repositories: PlanRepository[] = [];
+    const lines: string[] = [];
+    for (const name of names) {
+      const handle = this.handles.get(name);
+      if (!handle) {
+        repositories.push({ name, baseSha: null });
+        lines.push(`${name}: not under repositories: in collab-swarm.yml, so no branch was opened`);
+        continue;
+      }
+      const opened = handle.open(branch, options);
+      repositories.push({ name, baseSha: opened.baseSha });
+      lines.push(opened.message);
+    }
+    return { repositories, lines };
+  }
+
+  /**
    * Creates the claim branch from the remote default branch with a plan
    * skeleton, commits it, and pushes. A rejected push means someone else won
    * the race: the branch is removed and the checkout restored.
+   *
+   * With `repositories`, the same branch is first opened in each of those code
+   * repositories and the plan records where each starts. Opening is safe to
+   * repeat, so a lost race leaves behind only branches the winner will use.
    */
-  claim(slug: string, title: string, options: { fetch?: boolean; at?: Date } = {}): ClaimOutcome {
+  claim(
+    slug: string,
+    title: string,
+    options: { fetch?: boolean; at?: Date; repositories?: string[] } = {},
+  ): ClaimOutcome {
     if (!this.git.available) {
       return { ok: false, message: 'This directory is not a Git repository, so a claim cannot be recorded.' };
     }
@@ -226,6 +314,8 @@ export class Claims {
       };
     }
 
+    const opened = this.openRepositories(slug, options.repositories ?? [], options);
+
     const previous = this.git.currentBranch;
     const base = hasRemote && this.git.maybe(['rev-parse', '--verify', '--quiet', this.mainRef()]) !== null
       ? this.mainRef()
@@ -236,7 +326,7 @@ export class Claims {
     }
 
     const file = join(this.root, this.planPath(slug));
-    writeText(file, serializePlan(newPlan(slug, title, options.at)));
+    writeText(file, serializePlan(newPlan(slug, title, options.at, opened.repositories)));
     this.git.run(['add', '--', this.planPath(slug)]);
     const committed = this.git.run(['commit', '--quiet', '-m', `chore(${slug}): claim delivery row`]);
     if (!committed.ok) {
@@ -248,6 +338,7 @@ export class Claims {
       return {
         ok: true,
         branch,
+        repositories: opened.lines,
         message:
           `Claimed "${slug}" on the local branch ${branch} with ${this.planPath(slug)}. ` +
           `There is no "${remote}" remote, so nobody else can see this claim yet.`,
@@ -259,6 +350,7 @@ export class Claims {
       return {
         ok: true,
         branch,
+        repositories: opened.lines,
         message: `Claimed "${slug}" on ${remote}/${branch} with ${this.planPath(slug)}.`,
       };
     }

@@ -3,6 +3,7 @@ import { VERSION, type Args } from '../cli.js';
 import { PROGRAM } from '../util/program.js';
 import { CONFIG_FILE, inRoot, loadConfig } from '../config.js';
 import { Git } from '../core/git.js';
+import { Repository } from '../core/repositories.js';
 import { listPlanDirs } from '../core/plan.js';
 import { validateRepository } from '../core/validate.js';
 import { bundledPacks, loadPacks, locatePack, packName } from '../packs.js';
@@ -37,6 +38,26 @@ export async function run(_args: Args): Promise<number> {
     );
   } else {
     say('ok', `Git remote "${config.git.remote}", default branch "${config.git.defaultBranch}"`);
+  }
+
+  for (const repository of Object.values(config.repositories)) {
+    const handle = new Repository(root, repository);
+    if (!handle.checkedOut) {
+      say(
+        'warn',
+        `Repository "${repository.name}" is not checked out at ${repository.path}`,
+        'Its branches cannot be opened or read from here, so the board cannot confirm its code merged: ' +
+          `git submodule update --init ${repository.path}`,
+      );
+    } else if (handle.sha(handle.defaultRef) === null) {
+      say(
+        'fail',
+        `Repository "${repository.name}" has no ${handle.defaultRef}`,
+        `Fetch it, or correct repositories.${repository.name}.defaultBranch in ${CONFIG_FILE}.`,
+      );
+    } else {
+      say('ok', `Repository "${repository.name}" at ${repository.path}, merging into ${handle.defaultRef}`);
+    }
   }
 
   const packs = loadPacks(root, config.packs, config.packOptions);

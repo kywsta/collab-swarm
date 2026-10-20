@@ -44,6 +44,7 @@ Columns are matched by header name, so they may be renamed and reordered. `Slug`
 | Owner | lane, assignee, dev, who, team | the lane, matching a name in `lanes:` |
 | Size | estimate, points, effort | `XS`, `S`, `M`, `L`, `XL` |
 | Depends on | depends, dependencies, blocked by, waits on, needs | everything the row waits for |
+| Repositories | repository, repos, repo, codebases, codebase | in a hub, the code repositories the row's work lands in, by their names under `repositories:` |
 
 The slug cell is kebab-case, normally in backticks. `Depends on` mixes three kinds of blocker in one cell, each resolved differently:
 
@@ -52,6 +53,8 @@ The slug cell is kebab-case, normally in backticks. `Depends on` mixes three kin
 - **`D<n>`** — a product decision, freed by an answer or by a recorded working assumption.
 
 The phrase *every earlier feature* (or *all features*) in that cell expands to every row in an earlier milestone, which is how a release-readiness row waits for the whole backlog without listing it.
+
+In a hub, a `Repositories` cell such as `` `api`, `participant` `` lets `claim` open the feature's branch in each of them at once; the specification can add more later. Every name must be configured under `repositories:` in `collab-swarm.yml`, and `validate` reports one that is not. A row whose code lands in a repository is done only once its branch has merged there.
 
 Add no status column: a row's state is derived from Git — claimed by a branch, done by a complete plan on the default branch or a delivered row in the history — and a hand-maintained status cell only contradicts it.
 

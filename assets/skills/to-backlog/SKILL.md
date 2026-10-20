@@ -11,7 +11,7 @@ This skill decides **what gets built, in what order, by whom, and what a human m
 
 ## 1. Read the ground
 
-Read `collab-swarm.yml` first: `backlog`, `sources`, `lanes`, `plans`. Then read the sources it names — every product document, the design index, the API contract, the domain vocabulary, the decisions register. A source marked `owned: true` is a contract this repository defines rather than consumes, which decides whether a gap in it becomes a gate or a row.
+Read `collab-swarm.yml` first: `backlog`, `sources`, `lanes`, `plans`, and `repositories` when this is a [hub](../../workflow/WORKFLOW.md#code-repositories) — then each row also says, in a `Repositories` column, which code repositories its work lands in. Then read the sources it names — every product document, the design index, the API contract, the domain vocabulary, the decisions register. A source marked `owned: true` is a contract this repository defines rather than consumes, which decides whether a gap in it becomes a gate or a row.
 
 Then read what already exists, because a register written against an empty repository invents work that is already done:
 

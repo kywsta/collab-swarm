@@ -85,6 +85,7 @@ function stackSection(packs: Pack[]): string[] {
 
 export function renderMemoryBlock(context: EmitContext, workflowRoot: string): string {
   const { config, packs } = context;
+  const repositories = Object.values(config.repositories);
   const lines: string[] = [];
 
   lines.push(BLOCK_START);
@@ -145,7 +146,7 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
     '**One owner per concern.** A second module owning the same state is a duplicate owner. Capture failures at the seam and return them as values; callers render loading, empty, failure, and content as distinct states.',
     '**Machine-owned files stay machine-owned.** Edit the annotated source and regenerate; never hand-edit generated output.',
     '**Secrets stay out.** Keys, tokens, and hashes never enter Git or a plan document.',
-    config.checks.length > 0
+    config.checks.length > 0 || repositories.some((repository) => repository.checks.length > 0)
       ? `**Checks pass before done.** \`${checkCommand(context)}\` is green before a ticket is marked done, before a commit, and before completion is reported. Report the real result; a skipped or failing check is stated, never implied green.`
       : '**Checks pass before done.** Run the project\'s own checks before a ticket is marked done. Report the real result; a skipped or failing check is stated, never implied green.',
   ];
@@ -175,18 +176,59 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
     lines.push(
       `The feature register in [\`${config.backlog}\`](${config.backlog}) is the backlog and Git is the tracker: ` +
         `the branch \`${config.git.branchPrefix}<slug>\` on \`${config.git.remote}\` claims a row, and ` +
-        `\`${config.plans}/<slug>/plan.yml\` complete on \`${config.git.defaultBranch}\` marks it done. ` +
+        `\`${config.plans}/<slug>/plan.yml\` complete on \`${config.git.defaultBranch}\` marks it done` +
+        (repositories.length > 0
+          ? ' once the same branch has also merged in every code repository the plan names. '
+          : '. ') +
         'Nothing outside the repository records state, so every developer and every agent sees the same board after one fetch.',
     );
     lines.push('');
   }
 
-  if (config.checks.length > 0) {
+  if (repositories.length > 0) {
+    lines.push('## Code repositories');
+    lines.push('');
+    lines.push(
+      'This repository is the hub: it holds the sources, the backlog and the plans. The code lives in the repositories below, ' +
+        'each a Git repository of its own with its own default branch and checks.',
+    );
+    lines.push('');
+    lines.push(
+      ...table(
+        ['Repository', 'Path', 'Merges into', 'Checks'],
+        repositories.map((repository) => [
+          `\`${repository.name}\``,
+          `\`${repository.path}\``,
+          `\`${repository.defaultBranch}\``,
+          repository.checks.length > 0 ? repository.checks.map((check) => check.name).join(', ') : 'none configured',
+        ]),
+      ),
+    );
+    lines.push('');
+    lines.push(
+      `- A plan lists the repositories it touches in \`plan.yml\`, each with the \`base_sha\` its review starts from, and every ticket names the one it is built in with \`repository:\`.`,
+    );
+    lines.push(
+      `- A feature's branch is \`${config.git.branchPrefix}<slug>\` in the hub and in each of those repositories. Commit code in the repository it belongs to, on that branch; commit plan and document changes here.`,
+    );
+    lines.push(
+      `- \`${cli(context)} repos <slug>\` shows where the code stands in each one; \`--open <name>\` adds a repository the plan did not know about and opens its branch.`,
+    );
+    lines.push(
+      `- Verify a ticket with \`${cli(context)} check --repo <name> --focus <path>\`; the commands run in that repository's directory.`,
+    );
+    lines.push('');
+  }
+
+  if (config.checks.length > 0 || repositories.some((repository) => repository.checks.length > 0)) {
     lines.push('## Commands');
     lines.push('');
     const commands: [string, string][] = [
       [checkCommand(context), 'the project checks; CI runs the same set'],
       [`${cli(context)} check --focus <path>`, 'ticket verification'],
+      ...(repositories.length > 0
+        ? ([[`${cli(context)} repos <slug>`, "a feature's branch in each code repository"]] as [string, string][])
+        : []),
       [`${cli(context)} validate`, 'the workflow contract and every plan'],
       [`${cli(context)} status`, 'the delivery board'],
     ];
