@@ -6,7 +6,9 @@ import { readPackFile, ticketSkills } from '../packs.js';
 import { unresolvedMarkers, unresolvedVars } from '../options.js';
 import { exists, listDirs, listFiles, readTextOrNull } from '../util/fs.js';
 import { isSlug, readFrontMatter } from '../util/yaml.js';
+import { Git } from './git.js';
 import { historyFindings, historyPath } from './history.js';
+import { driftCheck, type DriftCheck } from './impact.js';
 import { Register } from './register.js';
 import { RULES_ROOT, RULE_ORIGINS, ROOT_SCOPE, type RuleSet } from './rulesets.js';
 import {
@@ -39,6 +41,8 @@ import {
 export interface PlanContext {
   /** The code repositories the configuration coordinates. */
   repositories?: Record<string, RepositoryConfig>;
+  /** Whether a plan's cited sources moved on the default branch since it was written. */
+  drift?: DriftCheck | null;
 }
 
 const SHA = /^[0-9a-f]{7,64}$/;
@@ -424,6 +428,12 @@ export function validatePlan(
   if (sha !== null && !SHA.test(sha)) {
     findings.error(planPath, 'implementation_base_sha is not a Git SHA');
   }
+  if (plan.sourcesSha !== null && !SHA.test(plan.sourcesSha)) {
+    findings.error(planPath, 'sources_sha is not a Git SHA');
+  } else {
+    const drift = context.drift?.check(planDir, plan);
+    if (drift) findings.warn(planPath, drift);
+  }
   if (stageOk && stageAtLeast(plan.stage, 'implementation') && sha === null) {
     findings.error(
       planPath,
@@ -557,6 +567,13 @@ function checkRuleSets(root: string, config: Config, sets: RuleSet[], findings: 
   }
 }
 
+/** The drift check for this checkout's plans, reading each row's sources from the backlog. */
+export function planDrift(root: string, config: Config): DriftCheck | null {
+  const backlog = config.backlog ? readTextOrNull(inRoot(root, config.backlog)) : null;
+  const register = backlog === null ? Register.empty() : Register.parse(backlog);
+  return driftCheck(new Git(root), root, config, (slug) => register.row(slug)?.sources ?? '');
+}
+
 /** Every plan under the configured plans root, plus the repository's own wiring. */
 export function validateRepository(
   root: string,
@@ -653,8 +670,9 @@ export function validateRepository(
   }
 
   const plansRoot = inRoot(root, config.plans);
+  const drift = planDrift(root, config);
   for (const dir of listPlanDirs(plansRoot)) {
-    validatePlan(join(plansRoot, dir), packs, findings, { repositories: config.repositories });
+    validatePlan(join(plansRoot, dir), packs, findings, { repositories: config.repositories, drift });
   }
 
   const history = inRoot(root, historyPath(config.plans));

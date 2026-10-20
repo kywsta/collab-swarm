@@ -4,6 +4,7 @@ feature: "feature-slug"
 title: "Feature title"
 stage: requirements
 status: in-progress
+sources_sha: null
 implementation_base_sha: null
 created_at: "1970-01-01T00:00:00Z"
 updated_at: "1970-01-01T00:00:00Z"

@@ -106,6 +106,17 @@ Write acceptance criteria as named, observable statements. Names such as **Unkno
 
 If a required source is missing or contradictory, write the question under `Constraints and open questions`. When the decisions register records a working assumption for that question, plan on the assumption, mark the affected criteria as assumed with the decision id, and continue; otherwise stop before technical planning. Mark unrelated concerns `Not applicable` with a short reason.
 
+## When the sources change
+
+Product, design and contract documents keep moving after the backlog is cut and after plans are written. Two records make a change traceable to the work it reaches: every register row cites its sources, and every plan records the commit its requirements were read from as `sources_sha` in `plan.yml`.
+
+- **The backlog is reconciled from the impact.** `npx collab-swarm impact` diffs the sources since the delivery plan was last committed — when it last agreed with them — and matches each changed section against the rows' `Sources` cells. It sorts the rows it reaches by what they have already done, and lists the changes no row cites. `to-backlog` works from that list.
+- **Done stays done.** A delivered row whose sources changed is never reopened or renamed: the changed behaviour is a new row that depends on it, and `compact-history` later records the original as superseded by it.
+- **A plan in flight is revised, not finished against stale requirements.** `validate` warns when a source the plan cites has changed on the default branch since its `sources_sha`. The plan merges the default branch, returns to requirements, revises what the changed sections touch, and records the new `sources_sha`. Whether a plan the change makes pointless is dropped instead is the user's call.
+- **Not started is free to change.** A row nobody has claimed is revised, resequenced or retired outright.
+
+A change to a source no row cites is either new work or a document the cited ones must absorb first — a business requirement the product documents have not caught up with yet is reconciled into them before any row moves.
+
 ## Specification
 
 The specification turns requirements into engineering decisions. It covers only relevant concerns: domain boundaries, data and integration mapping, dependency graph and lifetimes, state and concurrency, failure behaviour, interface and interaction, security, observability, performance, accessibility, localization, migration, and rollback. A concern an installed pack owns is decided in that pack's vocabulary.

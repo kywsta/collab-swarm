@@ -37,6 +37,7 @@ And the skills that produce and consume them, in the place each of your agents a
 | --- | --- |
 | *"We need customers to be able to gift a voucher"* | Researches what exists, interviews you until the behaviour is settled, writes the product, design and API documents, and puts the feature on the board |
 | *"Turn these PRDs into a delivery plan"* | Writes the milestones, the feature register, the human gates and the open decisions — ordered by dependency, cut so every lane has work on day one |
+| *"The BRDs changed — update the delivery plan"* | Finds every row and plan the changed sections reach, and sorts them by what each has already done: delivered work gets a follow-up row, plans in flight are revised, unstarted rows are reworked or retired |
 | *"What's next?"* | Reads the board, proposes the best unclaimed features, claims the one you pick |
 | *"Make a plan to implement password recovery"* | Grounds it in your sources, designs it against your codebase, splits it into vertical tickets — then stops for your review |
 | *"Implement the plan"* | Runs tickets in dependency order, test-first, verifying each with your checks, then reviews the whole diff |
@@ -214,11 +215,12 @@ npx collab-swarm plan <slug>             # scaffold a plan package by hand
 
 npx collab-swarm validate                # the workflow contract and every plan
 npx collab-swarm history                 # what has been delivered, and what can be compacted
+npx collab-swarm impact [--since <ref>]  # which rows and plans a change to the sources reaches
 npx collab-swarm check [--focus <path>]  # your configured checks, in order; --repo <name> for one code repository
 npx collab-swarm doctor                  # what is installed, stale, or missing
 ```
 
-`status`, `next`, `repos`, `rules`, `history`, `packs`, `steps` and `validate` accept `--json`.
+`status`, `next`, `repos`, `rules`, `history`, `impact`, `packs`, `steps` and `validate` accept `--json`.
 
 ## The backlog
 
@@ -393,6 +395,35 @@ Steps
 `steps --rules` inverts it — for each rule, every step it governs and the file that brought it into force. That is the shortest path to *why did it do that?*: a rule reaches a step either because the step writes a file inside the rule's globs, or because the rule names the skill as its recipe, and the map says which.
 
 Nothing is recorded to produce any of this. The map is read from the payload in your checkout, so it describes the skills you actually have, including everything your packs added — and the workflow keeps [no event log](assets/workflow/WORKFLOW.md), by design. It tells you what an agent is instructed to do, not what one did.
+
+## When the requirements change
+
+Requirements move after the backlog is cut: a new BRD version, a change request, a re-scoped PRD. Every row cites its sources, and every plan records the commit its requirements were read from (`sources_sha`), so the work a change reaches is found rather than remembered.
+
+```console
+$ npx collab-swarm impact
+
+Source impact · since docs/delivery-plan.md was last committed (a637579c1e2b, 2026-10-14: Plan M1) · 3 documents changed
+
+Changed sources
+- docs/prd/PRD-02-Participant-App.md · PRDs · changed in 2 sections
+- docs/brd/BRD-02-Participant-App.md · BRDs · changed in 4 sections
+- docs/brd/CR-02-Family-Rewards.md · BRDs · new
+
+Delivered, and the sources it was built from changed — what shipped may no longer be what is asked for
+- my-reward — My reward · M1 Entry
+    docs/prd/PRD-02-Participant-App.md · 7.7 My Reward
+
+In progress — its plan may be building what is no longer asked for
+- home — Participant home · M1 Entry · held by Ana
+    docs/prd/PRD-02-Participant-App.md · 7.4 Home
+
+Changed, and no row cites it — new work, or a document the cited ones must absorb first
+- docs/brd/BRD-02-Participant-App.md · BRDs · changed · 4.1 Screen map; 6. Rewards; and 2 more
+- docs/brd/CR-02-Family-Rewards.md · BRDs · new
+```
+
+A citation is matched however the row writes it — a path, a file name or a document id such as `PRD-02`, followed by `§7.4`, `#anchor` or a quoted heading — and a row whose cited section changed is told apart from one that only cites the same document. Ask your agent to *"update the delivery plan"*: `to-backlog` starts from this list. A delivered row stays done and gets a follow-up row, an unstarted one is reworked or retired, and a plan in flight is revised by its holder, because `validate` warns on their branch once a source it cites has moved on the default branch.
 
 ## Keeping the repository small
 

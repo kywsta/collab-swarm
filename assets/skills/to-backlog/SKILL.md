@@ -1,6 +1,6 @@
 ---
 name: to-backlog
-description: Write or update the delivery plan the board reads — milestones, the feature register, the human gates and the decisions register — from the project's product, design and API documents, ordered by dependency and cut so every lane has work on day one. Use when a project has no backlog, when new product documents land, when the register has drifted from what is being built, or when a milestone must be resequenced.
+description: Write or update the delivery plan the board reads — milestones, the feature register, the human gates and the decisions register — from the project's product, design and API documents, ordered by dependency and cut so every lane has work on day one. Use when a project has no backlog, when product documents land or change, when the register has drifted from what is being built, or when a milestone must be resequenced.
 ---
 
 # Write the Delivery Plan
@@ -21,6 +21,14 @@ npx collab-swarm packs       # which concerns have skills, which do not
 ```
 
 Walk the codebase for the surfaces, data and infrastructure already in place, and read the existing backlog when there is one.
+
+When a backlog exists and the sources have changed since, start from what changed rather than from a fresh read:
+
+```bash
+npx collab-swarm impact      # changed sections, the rows citing them by state, and changes no row cites
+```
+
+It compares with the commit that last touched the backlog; pass `--since <ref>` when the plan was last reconciled earlier. Read every changed section it names before deciding anything about the rows that cite it. A change no row cites is either new work, or a business document the product documents have not absorbed yet: reconcile it into them first — the rows cite those — and ask the user where the two disagree.
 
 Documents the user points at that `sources:` does not declare are read the same way, and then added under `sources:` with a `use:` line, so every plan written later cites them instead of rediscovering them; run `npx collab-swarm sync` after editing the config.
 
@@ -70,7 +78,13 @@ Done when every gate has an owner and a status, every `open` gate genuinely stop
 
 Write `backlog:` following [the backlog format](BACKLOG-FORMAT.md), seeded from [the template](../../workflow/templates/backlog.md) when the file does not exist yet.
 
-Updating an existing plan is a reconciliation, not a rewrite: keep every slug already claimed or done exactly as it is, keep the rows they depend on, and add, resequence or retire the rest. A slug in the delivery history (`<plans>/HISTORY.md`) is done and never reused for new work; delivered milestones are retired by `compact-history`, not here. A row that turned out to be wrong is deleted with its reason noted in the commit message, not marked with a status column — state is derived from Git.
+Updating an existing plan is a reconciliation, not a rewrite: keep every slug already claimed or done exactly as it is, keep the rows they depend on, and add, resequence or retire the rest. When the sources changed, the impact decides what each reached row needs:
+
+- **Delivered** — the slug stays done. Behaviour that changed is a new row with a new slug, depending on the original; its title says what changes.
+- **In progress** — the row stays; its plan is revised by `deliver-change`, which `validate` will point at the change. Name each one and its holder in the report, so they hear it from the plan rather than at review. A row the change makes pointless is the user's call: drop it, or let it finish.
+- **Not started** — revise its title, sources, size and dependencies, resequence it, or delete it.
+
+A row whose citation no longer resolves — a document deleted or renamed, a section renumbered — has its `Sources` cell corrected whatever its state, so the next impact can still find it. A slug in the delivery history (`<plans>/HISTORY.md`) is done and never reused for new work; delivered milestones are retired by `compact-history`, not here. A row that turned out to be wrong is deleted with its reason noted in the commit message, not marked with a status column — state is derived from Git.
 
 The plan says **what** is being built and **who waits on whom**. How a feature is planned, implemented, reviewed and completed lives in the workflow contract; restating it here creates a second copy to keep true.
 

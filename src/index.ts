@@ -33,6 +33,23 @@ export {
 } from './core/repositories.js';
 export { Git } from './core/git.js';
 export {
+  DriftReader,
+  changedSources,
+  citations,
+  driftCheck,
+  impactOf,
+  sourceImpact,
+  type Citation,
+  type DriftCheck,
+  type DriftState,
+  type Effect,
+  type ImpactReport,
+  type PlanDrift,
+  type Reach,
+  type RowImpact,
+  type SourceChange,
+} from './core/impact.js';
+export {
   PLAN_STAGES,
   PLAN_STATUSES,
   TICKET_STATUSES,
