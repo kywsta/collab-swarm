@@ -5,7 +5,9 @@ The core workflow is deliberately ignorant of your stack. It knows how to turn a
 Two kinds of pack, same format:
 
 - **A published pack** for a stack somebody has already packaged — installed with `npm install -D collab-swarm-pack-go && npx collab-swarm add collab-swarm-pack-go`, and written to be true of every project using that stack. This document is how you write one.
-- **A stack pack for one project**, written from that project's own code: the call adapter everything routes through, the base class every handler extends, the wrapper used instead of raw exceptions. None of that generalises, so it is authored in the repository rather than installed. Ask an agent to run the `to-pack` skill, which researches the codebase and writes it into `.collab-swarm/packs/<name>/`. Everything below still applies — `to-pack` follows this format.
+- **A pack authored in one repository**, with `npx collab-swarm pack new`, when a team wants to share its conventions with other projects.
+
+A project's *own* conventions — the call adapter everything routes through, the base class every handler extends — do not need a pack. They belong in its **rule set**, which the `to-rules` skill researches from the code and from best practice for the versions it uses, and which a pack only seeds as a baseline. Packs are optional and none is attached by default.
 
 ## What a pack contributes
 
@@ -172,7 +174,7 @@ A pack may describe the architecture it installs. It is rendered into `AGENTS.md
 
 `packages` is joined with the packages the chosen options bring in, de-duplicated by name. Declaring a package documents it; nothing is written to the project's dependency manifest, because adding a dependency is the agent's job when a ticket needs it.
 
-`detect` lists files whose presence suggests the pack, so `npx collab-swarm init` offers the matching one first:
+`detect` lists files whose presence suggests the pack. Nothing attaches it unasked: `npx collab-swarm rules` names it as a possible baseline for a repository that holds one of them and has no rule set yet:
 
 ```json
 "detect": ["pubspec.yaml"]

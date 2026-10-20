@@ -7,6 +7,7 @@
  */
 
 import { ROLE_LABEL, SKILL_ROLES, type Pack } from '../packs.js';
+import { RULES_ROOT, type RuleSet } from '../core/rulesets.js';
 import { INVOCATION } from '../util/program.js';
 import type { EmitContext } from './types.js';
 
@@ -29,56 +30,66 @@ const table = (header: string[], rows: string[][]): string[] => [
  * which skill to open, and the reason it reaches for an installed library
  * instead of adding a new one.
  */
-function stackSection(packs: Pack[]): string[] {
-  const described = packs.filter((pack) => pack.stack !== null && !pack.core);
-  if (described.length === 0) return [];
+function stackSection(packs: Pack[], profile: string | null): string[] {
+  const described = packs.filter((pack) => pack.stack !== null && !pack.core && !pack.repository);
+  if (described.length === 0 && profile === null) return [];
 
   const lines: string[] = ['## Stack', ''];
+  // The researched profile is the project's own account of its stack; a
+  // pack's description is the baseline it started from.
+  if (profile !== null) lines.push(profile, '');
   for (const pack of described) {
-    const stack = pack.stack!;
-    if (described.length > 1) lines.push(`### ${pack.title}`, '');
-    if (stack.summary) lines.push(stack.summary, '');
+    if (described.length > 1 || profile !== null) lines.push(`### ${pack.title}`, '');
+    lines.push(...describeStack(pack));
+  }
+  return lines;
+}
 
-    const answered = pack.options.filter((option) =>
-      option.choices.some((choice) => choice.id === pack.selections[option.id]),
+/** One pack's stack declaration: its summary, chosen slots, libraries, layout and conventions. */
+export function describeStack(pack: Pack): string[] {
+  const stack = pack.stack!;
+  const lines: string[] = [];
+  if (stack.summary) lines.push(stack.summary, '');
+
+  const answered = pack.options.filter((option) =>
+    option.choices.some((choice) => choice.id === pack.selections[option.id]),
+  );
+  if (answered.length > 0) {
+    lines.push(
+      ...table(
+        ['Slot', 'This project uses'],
+        answered.map((option) => {
+          const chosen = option.choices.find((choice) => choice.id === pack.selections[option.id])!;
+          return [option.question, chosen.label];
+        }),
+      ),
+      '',
+      `Answered once in \`collab-swarm.yml\` under \`${pack.repository ? `repositories.${pack.repository}.` : ''}packOptions.${pack.name}\`. ` +
+        'The skills and rules installed here are the ones those answers selected; ' +
+        'changing an answer changes them, so a concern the table rules out has no skill to route to.',
+      '',
     );
-    if (answered.length > 0) {
-      lines.push(
-        ...table(
-          ['Slot', 'This project uses'],
-          answered.map((option) => {
-            const chosen = option.choices.find((choice) => choice.id === pack.selections[option.id])!;
-            return [option.question, chosen.label];
-          }),
-        ),
-        '',
-        `Answered once in \`collab-swarm.yml\` under \`packOptions.${pack.name}\`. ` +
-          'The skills and rules installed here are the ones those answers selected; ' +
-          'changing an answer changes them, so a concern the table rules out has no skill to route to.',
-        '',
-      );
-    }
+  }
 
-    if (stack.packages.length > 0) {
-      lines.push(
-        ...table(
-          ['Library', 'Use it for'],
-          stack.packages
-            .filter((pkg) => pkg.use)
-            .map((pkg) => [`\`${pkg.name}\``, pkg.use!]),
-        ),
-        '',
-        'Reach for one of these before adding a dependency. A library the stack does not list is a decision, not a detail: name it in the specification.',
-        '',
-      );
-    }
+  if (stack.packages.length > 0) {
+    lines.push(
+      ...table(
+        ['Library', 'Use it for'],
+        stack.packages
+          .filter((pkg) => pkg.use)
+          .map((pkg) => [`\`${pkg.name}\``, pkg.use!]),
+      ),
+      '',
+      'Reach for one of these before adding a dependency. A library the stack does not list is a decision, not a detail: name it in the specification.',
+      '',
+    );
+  }
 
-    if (stack.layout.length > 0) {
-      lines.push('```text', ...stack.layout, '```', '');
-    }
-    if (stack.conventions.length > 0) {
-      lines.push(...stack.conventions.map((line) => `- ${line}`), '');
-    }
+  if (stack.layout.length > 0) {
+    lines.push('```text', ...stack.layout, '```', '');
+  }
+  if (stack.conventions.length > 0) {
+    lines.push(...stack.conventions.map((line) => `- ${line}`), '');
   }
   return lines;
 }
@@ -123,6 +134,10 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
         [
           '`Fix <small thing>` / `Change <small thing>`',
           '`small-change` states a short contract, asks whether to record it, builds it test-first, and reviews it against that contract; anything bigger goes to a plan',
+        ],
+        [
+          '`Research the rule set for <repository>`',
+          '`to-rules` reads the repository and the official guidance for the versions it uses, proposes the conventions it is built by, and writes the agreed ones to `.collab-swarm/rules/<repository>/`; `npx collab-swarm rules` says when one has fallen behind',
         ],
         [
           '`Compact the project history`',
@@ -193,14 +208,16 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
         'each a Git repository of its own with its own default branch and checks.',
     );
     lines.push('');
+    const ruleSets = new Map((context.ruleSets ?? []).map((set) => [set.scope.name, set]));
     lines.push(
       ...table(
-        ['Repository', 'Path', 'Merges into', 'Checks'],
+        ['Repository', 'Path', 'Merges into', 'Checks', 'Rules'],
         repositories.map((repository) => [
           `\`${repository.name}\``,
           `\`${repository.path}\``,
           `\`${repository.defaultBranch}\``,
           repository.checks.length > 0 ? repository.checks.map((check) => check.name).join(', ') : 'none configured',
+          rulesCell(ruleSets.get(repository.name), repository.packs),
         ]),
       ),
     );
@@ -216,6 +233,10 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
     );
     lines.push(
       `- Verify a ticket with \`${cli(context)} check --repo <name> --focus <path>\`; the commands run in that repository's directory.`,
+    );
+    lines.push(
+      "- Each repository's rules are published scoped to its path, so they load for its files and no others. " +
+        `They are researched with \`to-rules\`, and \`${cli(context)} rules\` says when one has fallen behind its code.`,
     );
     lines.push('');
   }
@@ -241,7 +262,7 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
     lines.push('');
   }
 
-  lines.push(...stackSection(packs.packs));
+  lines.push(...stackSection(packs.packs, context.profile ?? null));
 
   const skills = [...packs.skills].sort((a, b) => a.name.localeCompare(b.name));
   if (skills.length > 0) {
@@ -264,6 +285,15 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
 
   lines.push(BLOCK_END);
   return lines.join('\n');
+}
+
+/** Where a repository's rules come from, for the repositories table. */
+function rulesCell(set: RuleSet | undefined, packs: string[]): string {
+  const written = set !== undefined && (set.rules.length + set.skills.length > 0 || set.stack !== null);
+  const parts: string[] = [];
+  if (written) parts.push(`\`${RULES_ROOT}/${set!.scope.name}/\``);
+  if (packs.length > 0) parts.push(`${written ? 'on ' : ''}${packs.join(', ')} baseline`);
+  return parts.length > 0 ? parts.join(' ') : 'none yet';
 }
 
 /**

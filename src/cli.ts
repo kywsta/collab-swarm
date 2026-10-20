@@ -73,7 +73,10 @@ ${style.bold('Usage')}
 ${style.bold('Set up')}
   init                     Install the workflow into this repository
   sync [--check] [--force] Re-apply skills, rules and instructions after an upgrade
-  add <pack...>            Attach a skill pack: a default pack, an npm package, or a path
+  rules [<name>]           Each repository's rule set, and whether it has fallen behind the code
+        [--record]         ...note what the repository depends on now, after researching it
+  add <pack...>            Attach a skill pack as a baseline: a default pack, an npm package, or a path
+        [--repo <name>]    ...for one coordinated repository's rule set
   packs                    List installed packs and what each contributes
   pack list                The default packs shipped with collab-swarm
   pack options <pack>      Re-answer what a pack asked, and re-apply it
@@ -117,6 +120,8 @@ async function dispatch(args: Args): Promise<number> {
       return (await import('./commands/claim.js')).run(args);
     case 'repos':
       return (await import('./commands/repos.js')).run(args);
+    case 'rules':
+      return (await import('./commands/rules.js')).run(args);
     case 'history':
       return (await import('./commands/history.js')).run(args);
     case 'plan':

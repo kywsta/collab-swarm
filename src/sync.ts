@@ -9,7 +9,8 @@
 
 import { dirname, join } from 'node:path';
 import type { Config } from './config.js';
-import { loadPacks, readPackFile, type PackSet } from './packs.js';
+import { readPackFile, type PackSet } from './packs.js';
+import { loadWorkspace } from './workspace.js';
 import {
   digest,
   exists,
@@ -90,10 +91,12 @@ function skillPayload(packs: PackSet, skillRoot: string): Emission[] {
 }
 
 export function buildContext(root: string, config: Config, version: string): EmitContext {
-  const packs = loadPacks(root, config.packs, config.packOptions);
+  const packs = loadWorkspace(root, config);
   return {
     config,
     packs,
+    profile: packs.profile,
+    ruleSets: packs.ruleSets,
     root,
     workflow: workflowDocuments(packs),
     skills: [...packs.skills].sort((a, b) => a.name.localeCompare(b.name)),

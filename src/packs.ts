@@ -93,6 +93,10 @@ export interface RuleEntry {
   pack: string;
   selections: Selections;
   vars: OptionVars;
+  /** The coordinated repository the rule governs; absent for this repository's own. */
+  repository?: string;
+  /** The rule's text, when it is composed rather than read from `path`. */
+  content?: string;
 }
 
 export interface PackCheck {
@@ -146,6 +150,8 @@ export interface Pack {
   core: boolean;
   /** True for a default pack bundled with collab-swarm. */
   bundled: boolean;
+  /** The repository whose rule set it is the baseline of; absent for this repository's own. */
+  repository?: string;
 }
 
 const filesIn = (dir: string): string[] =>

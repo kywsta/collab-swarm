@@ -1,11 +1,12 @@
 import { flagBool, type Args } from '../cli.js';
 import { loadConfig } from '../config.js';
-import { ROLE_LABEL, loadPacks } from '../packs.js';
+import { ROLE_LABEL } from '../packs.js';
+import { loadWorkspace } from '../workspace.js';
 import { heading, out, style } from '../util/log.js';
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const set = loadPacks(root, config.packs, config.packOptions);
+  const set = loadWorkspace(root, config);
 
   if (flagBool(args, 'json')) {
     out(

@@ -138,13 +138,17 @@ Which concern skills exist depends on the installed packs. Read the ticket's `sk
 
 A pack with several concerns ships a **router**: one skill that reads the ticket and selects the smallest applicable set for each slice, so a ticket touching only error handling never loads the navigation skill. Where a router exists, `implement` uses it once per slice instead of reading every concern skill the pack ships. A router is never named in a ticket; nor is a review skill. Only ticket-role skills are.
 
-## Stack skills
+## Rule sets
 
-The workflow above knows nothing about the stack. What the project is written in, the conventions it has settled on, and the way its libraries are actually used live in a **stack pack**: a router, one skill per concern, path-scoped rules, and the checks they need.
+The workflow above knows nothing about the stack. What a repository is written in, the conventions it has settled on, and the way its libraries are actually used live in its **rule set**: a stack profile and path-scoped rules, kept in `.collab-swarm/rules/<name>/` — one per repository a [hub](#code-repositories) coordinates, and `root` for this one.
 
-A pack is installed (`npx collab-swarm add collab-swarm-pack-go`) or written for this project from its own code (`to-pack`, which researches the repository and authors one). Either way the skills are vendored into every agent's directory by `sync`, so the same concern is implemented the same way by every developer and every agent.
+- **Researched, not assumed.** `to-rules` reads the repository — its manifests and exact versions, its tooling, the instructions it already carries, and features built end to end — and the official guidance for those versions, then proposes the rules and writes the ones the user agrees. Where best practice and the code disagree, the user decides.
+- **Researched again as the code grows.** `npx collab-swarm rules` compares each repository with what its last research recorded, and reports packages added, removed or moved a major version, and rules whose globs match no file. That is the signal to run `to-rules` again.
+- **Scoped to its repository.** Globs are written relative to the repository; publishing adds its path, so a session started in the hub loads a repository's rules only for that repository's files.
+- **Packs are optional baselines.** None is attached by default. Where a pack exists for a stack (`npx collab-swarm add flutter --repo participant`), its skills and rules are the set's starting point, and a rule of the same name in the set replaces the pack's.
+- **Who wrote a rule is recorded.** A rule's `origin` is `research` or `team`; a later research pass revises its own rules and proposes, never makes, a change to the team's.
 
-A project with no pack is not broken — `implement` falls back to TDD and the code already present — but nothing owns any concern, so each agent decides afresh how this project builds an endpoint or a screen. Write the pack once the second feature repeats the first one's decisions.
+Everything is vendored into every agent's directory by `sync`, so the same concern is built the same way by every developer and every agent. A repository with no rule set is not broken — `implement` falls back to TDD and the code already present — but nothing pins its conventions down, so each agent decides afresh how it builds an endpoint or a screen. Research the set once the second feature repeats the first one's decisions.
 
 ## Project checks
 

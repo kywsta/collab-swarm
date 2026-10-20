@@ -2,13 +2,13 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { flagBool, type Args } from '../cli.js';
 import { inRoot, loadConfig } from '../config.js';
 import { Findings, validatePlan, validateRepository } from '../core/validate.js';
-import { loadPacks } from '../packs.js';
+import { loadWorkspace } from '../workspace.js';
 import { listPlanDirs } from '../core/plan.js';
 import { fail, ok, out, style, warn } from '../util/log.js';
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const packs = loadPacks(root, config.packs, config.packOptions);
+  const packs = loadWorkspace(root, config);
   const asJson = flagBool(args, 'json');
 
   const target = args.positional[0];

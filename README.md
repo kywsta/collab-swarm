@@ -4,7 +4,7 @@
 
 A team of people and a swarm of agents share one backlog, one plan format, and one set of checks. Git is the only tracker: a branch claims a feature, a completed plan on the default branch marks it done. Everyone — and every agent, in every tool — sees the same board after one fetch.
 
-Language and framework agnostic. Framework skills are added as packs.
+Language and framework agnostic. Each repository's conventions are researched from its own code into a rule set; packs are optional baselines.
 
 ```bash
 npm install -D collab-swarm
@@ -42,6 +42,7 @@ And the skills that produce and consume them, in the place each of your agents a
 | *"Implement the plan"* | Runs tickets in dependency order, test-first, verifying each with your checks, then reviews the whole diff |
 | *"Resume the password-recovery plan"* | Picks up from the stage recorded in `plan.yml` |
 | *"Show a zero price as Free"* | Too small to plan: states a short contract, asks whether to record it, builds it test-first, and reviews the diff against that contract — off the board, no plan |
+| *"Research the rule set for api"* | Reads the repository and the official guidance for the versions it uses, proposes the conventions it is built by with their evidence, and writes the ones you agree — again whenever the code has moved on |
 | *"Compact the project history"* | Folds finished and superseded plans into one short delivery history, promotes what still matters, retires delivered milestones from the backlog — and deletes nothing you have not agreed to |
 
 ## Why a swarm needs this
@@ -127,7 +128,7 @@ git: { remote: origin, defaultBranch: main, branchPrefix: "feat/" }
 packs: []
 ```
 
-`init` detects your ecosystem (Node, Python, Go, Rust, Flutter/Dart) and prefills `checks`, detects common source locations, and offers the default skill pack that matches your repository. Edit it, run `npx collab-swarm sync`, and every agent's instructions are regenerated.
+`init` detects your ecosystem (Node, Laravel, Python, Go, Rust, Flutter/Dart) and prefills `checks`, and detects common source locations. It attaches no pack: the rules your code is built by are [researched](#rule-sets), with a pack as the starting point only where you ask for one. Edit it, run `npx collab-swarm sync`, and every agent's instructions are regenerated.
 
 ### Frontend, backend, or both
 
@@ -197,10 +198,11 @@ $ npx collab-swarm claim check-in-gate
 ```bash
 npx collab-swarm init                    # install into this repository
 npx collab-swarm sync [--check|--force]  # re-apply after an upgrade; --check fails CI when stale
-npx collab-swarm add <pack>              # attach a default pack, an npm package, or a path
+npx collab-swarm rules [<name>]           # each rule set, and whether it has fallen behind its code; --record after research
+npx collab-swarm add <pack> [--repo <n>] # attach a pack as a baseline: a default pack, an npm package, or a path
 npx collab-swarm pack list               # the default packs shipped with collab-swarm
 npx collab-swarm pack options <pack>     # re-answer what a pack asked, and re-apply it
-npx collab-swarm pack new <name>         # scaffold a pack for this project's own stack
+npx collab-swarm pack new <name>         # scaffold a pack to share a stack across projects
 npx collab-swarm packs                   # what each installed pack contributes
 npx collab-swarm steps [<skill>]         # what each skill does, step by step, and the rules in force
 
@@ -216,7 +218,7 @@ npx collab-swarm check [--focus <path>]  # your configured checks, in order; --r
 npx collab-swarm doctor                  # what is installed, stale, or missing
 ```
 
-`status`, `next`, `repos`, `history`, `packs`, `steps` and `validate` accept `--json`.
+`status`, `next`, `repos`, `rules`, `history`, `packs`, `steps` and `validate` accept `--json`.
 
 ## The backlog
 
@@ -241,15 +243,56 @@ Proposals are ranked by earliest milestone, then the asker's lane, then how many
 
 A capability none of your documents describes yet does not get a row invented for it. `new-feature` shapes it first — what exists today, what the user actually means, what the states and boundaries are — writes that into your product, design and API documents, and only then registers the rows that deliver it. A change to behaviour a document already describes skips all of that and goes straight to a plan.
 
-## Skill packs
+## Rule sets
 
-The core workflow knows nothing about your stack. A pack adds what does: concern skills, path-scoped rules, the architecture they assume, and suggested checks.
+The core workflow knows nothing about your stack. What each repository is written in, the conventions its code has settled on, and the way its libraries are actually used go in its **rule set**: a stack profile and path-scoped rules, kept in `.collab-swarm/rules/<repository>/` — `root` for this repository, or one per repository a [hub](#a-hub-with-the-code-in-other-repositories) coordinates.
 
-Some ship inside collab-swarm. `init` offers the one that matches your repository, or add it later:
+Ask your agent for one:
+
+```text
+"Research the rule set for api."
+```
+
+The `to-rules` skill reads the repository — its manifests and the exact versions in its lockfile, its build, lint and test config, the agent instructions it already carries, and two or three features built end to end — then the official guidance for those versions. It proposes a profile and a rule per concern, each with its evidence, asks you where best practice and the code disagree, and writes only what you agree:
+
+```text
+.collab-swarm/rules/api/
+├── STACK.md                  # Laravel 12 on PHP 8.4, what it is built with, the conventions everywhere
+├── rules/
+│   ├── http-endpoints.md     # app/Http/**, routes/api.php
+│   └── queue-jobs.md         # app/Jobs/**
+└── research.json             # what api depended on when this was researched
+```
+
+The rule that separates a useful rule from a wasted one is that **it names your code** — the form request every endpoint validates through, the action class that holds the work — not "validate your input". A rule that restates the framework's documentation costs tokens on every matching file and teaches nothing.
+
+Globs are written relative to the repository. `sync` adds its path and publishes the set into every agent target, so a session started in the hub loads api's rules only while it touches api's files, and its stack profile with them.
+
+A rule set is meant to be researched again as the code grows. `npx collab-swarm rules` compares each repository with what its last research recorded:
+
+```console
+$ npx collab-swarm rules
+
+Rule sets · .collab-swarm/rules/
+- api · repositories/api · behind the repository · 6 rules (5 research, 1 team) · stack profile · researched 2026-10-20
+    added since: composer:spatie/laravel-permission
+    major upgrades: composer:laravel/framework ^11.0 → ^12.0
+- dashboard · repositories/dashboard · no rule set — agents build from their own priors
+- participant · repositories/participant · pack baseline only, nothing researched yet · baseline flutter
+```
+
+Each rule records who wrote it — `origin: research` or `origin: team` — and a later pass revises only its own, proposing any change to yours. `doctor` reports a set that has fallen behind; `validate` reports a glob that repeats the repository's path and two sources publishing the same rule or skill.
+
+## Packs: optional baselines
+
+None is attached by default. A pack is a rule set somebody has already written for a whole stack — concern skills, path-scoped rules, the architecture they assume, and suggested checks — and where one fits a repository, it is the baseline that repository's rule set builds on. A rule in the set with the same file name replaces the pack's; everything else adds to it.
+
+Some ship inside collab-swarm. Attach one to the repository it fits:
 
 ```bash
-npx collab-swarm pack list      # what ships with this version
-npx collab-swarm add flutter    # nothing to install; it is already here
+npx collab-swarm pack list                       # what ships with this version
+npx collab-swarm add flutter --repo participant  # a baseline for one repository
+npx collab-swarm add flutter                     # or for this repository itself
 ```
 
 A pack asks about the slots every team fills differently, and installs itself around your answers:
@@ -264,7 +307,7 @@ Push notifications
 A number, or Enter for 1. Firebase Cloud Messaging: 2
 ```
 
-Answers are recorded in `collab-swarm.yml`, so a teammate's `npx collab-swarm sync` reproduces the same files without being asked anything. Change one later with `npx collab-swarm pack options flutter`; a skill your new answer rules out is removed from every target rather than left behind.
+Answers are recorded in `collab-swarm.yml`, so a teammate's `npx collab-swarm sync` reproduces the same files without being asked anything. Each repository keeps its own answers, so two apps on the same stack may answer differently. Change one later with `npx collab-swarm pack options flutter --repo participant`; a skill your new answer rules out is removed from every target rather than left behind.
 
 Anything else is an npm package or a directory:
 
@@ -307,29 +350,6 @@ collab-swarm-pack-go/
 A pack may also declare the architecture it installs — the layout, the conventions, and the libraries it is built on. That is rendered into `AGENTS.md` and `CLAUDE.md` beside the chosen integrations, so an agent reads it before deciding which skill to open, and reaches for a library you already have instead of adding one.
 
 See [docs/PACKS.md](docs/PACKS.md) for options, conditions and the stack declaration, and [`examples/pack-example`](examples/pack-example) for a working pack.
-
-## Skills for your own stack
-
-A default pack only exists for stacks somebody has already packaged. Your project's conventions — the call adapter everything routes through, the base class every handler extends, the wrapper you use instead of raw exceptions — exist in your code and nowhere else.
-
-Ask your agent for them:
-
-```text
-"Write the skills for this project's stack."
-```
-
-The `to-pack` skill reads your dependency manifest, your build and lint config, and two or three features already built end to end, proposes the concerns it found, and then writes a pack into `.collab-swarm/packs/<name>/`:
-
-```text
-flutter-dev                routes a ticket to its concerns
-flutter-api-integration    implements a ticket
-flutter-state-management   implements a ticket
-flutter-ui-implement       implements a ticket
-flutter-ui-review          reviews one surface
-rules/api-integration.md   lib/**/data/**, lib/**/domain/**
-```
-
-The rule that separates a useful stack skill from a wasted one is that **it names your code**. `guardedParse`, `privateApiClientProvider`, `@RestApi(parser: Parser.FlutterCompute)` — not "use your HTTP client". A skill that restates the framework's documentation costs tokens on every turn and teaches nothing.
 
 The **router** is what keeps a large pack cheap. `implement` hands it each red-green slice, and it selects the smallest applicable set, so a ticket that only touches error handling never loads the navigation skill:
 

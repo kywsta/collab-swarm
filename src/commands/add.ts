@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { VERSION, flagBool, flagString, type Args } from '../cli.js';
 import { PROGRAM } from '../util/program.js';
 import { CONFIG_FILE, loadConfig, serializeConfig } from '../config.js';
-import { askOptions, describePack, offerChecks, record } from '../attach.js';
+import { askOptions, describePack, offerChecks, packHolder, record } from '../attach.js';
 import { parseSelections } from '../options.js';
 import { bundledPackNames, resolvePack } from '../packs.js';
 import { applySync, planSync } from '../sync.js';
@@ -26,11 +26,14 @@ export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
   const assumeYes = flagBool(args, 'yes') || flagBool(args, 'y') || !interactive();
   const preset = parseSelections(flagString(args, 'options') ?? '');
+  const repo = flagString(args, 'repo');
+  const holder = packHolder(config, repo);
+  const where = repo === null ? '' : ` --repo ${repo}`;
   const added: string[] = [];
 
   for (const spec of specs) {
-    if (config.packs.includes(spec)) {
-      info(`"${spec}" is already attached. Change its answers with: npx collab-swarm pack options ${spec}`);
+    if (holder.packs.includes(spec)) {
+      info(`"${spec}" is already attached. Change its answers with: npx collab-swarm pack options ${spec}${where}`);
       continue;
     }
 
@@ -43,9 +46,9 @@ export async function run(args: Args): Promise<number> {
     heading(`${pack.title} ${style.dim(pack.bundled ? `(default pack · ${pack.name})` : `(${pack.name})`)}`);
     describePack(pack);
 
-    record(config, spec, pack, answers);
+    record(holder, spec, pack, answers);
     added.push(spec);
-    config.checks.push(...(await offerChecks(config, pack, assumeYes)));
+    holder.checks.push(...(await offerChecks(holder, pack, assumeYes)));
   }
 
   if (added.length === 0) return 0;
@@ -54,7 +57,13 @@ export async function run(args: Args): Promise<number> {
   const plan = planSync(root, config, VERSION);
   const result = applySync(root, plan, config, VERSION);
 
-  ok(`Attached ${added.join(', ')} · ${result.written.length} file(s) written`);
+  ok(
+    `Attached ${added.join(', ')}${repo === null ? '' : ` as the baseline of ${repo}'s rule set`} · ` +
+      `${result.written.length} file(s) written`,
+  );
+  if (repo !== null) {
+    out(style.dim(`  Build on it for this repository: ask your agent to "research the rule set for ${repo}".`));
+  }
   out(style.dim('  Read it back: npx collab-swarm packs · npx collab-swarm steps'));
   out(style.dim('  Commit the generated files so every teammate and agent picks the pack up.'));
   return 0;

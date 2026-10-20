@@ -6,7 +6,8 @@ import {
   type RuleCoverage,
   type SkillMap,
 } from '../core/steps.js';
-import { ROLE_LABEL, loadPacks } from '../packs.js';
+import { ROLE_LABEL } from '../packs.js';
+import { loadWorkspace } from '../workspace.js';
 import { CliError, out, style } from '../util/log.js';
 
 const JOIN = style.dim(' · ');
@@ -165,7 +166,7 @@ function renderRules(rules: RuleCoverage[], plans: string): void {
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const packs = loadPacks(root, config.packs, config.packOptions);
+  const packs = loadWorkspace(root, config);
   const map = buildStepMap(packs, { plansDir: config.plans });
 
   const wanted = args.positional[0];

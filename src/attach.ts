@@ -6,6 +6,7 @@
  * to the same place, and the same summary printed back.
  */
 
+import { CliError } from './util/log.js';
 import type { CheckConfig, Config } from './config.js';
 import type { Pack } from './packs.js';
 import { type Selections } from './options.js';
@@ -91,12 +92,12 @@ export function describePack(pack: Pack): void {
  * and CI all run.
  */
 export async function offerChecks(
-  config: Config,
+  holder: PackHolder,
   pack: Pack,
   assumeYes: boolean,
 ): Promise<CheckConfig[]> {
   const fresh = pack.checks.filter(
-    (check) => !config.checks.some((existing) => existing.name === check.name),
+    (check) => !holder.checks.some((existing) => existing.name === check.name),
   );
   if (fresh.length === 0) return [];
   const accept = assumeYes || (await confirm(`  Add its ${fresh.length} suggested check(s)?`, true));
@@ -109,9 +110,35 @@ export async function offerChecks(
  * The caller writes the file and runs the sync, so `init` can attach a pack
  * before it has written `collab-swarm.yml` for the first time.
  */
-export function record(config: Config, spec: string, pack: Pack, answers: Selections): void {
-  if (!config.packs.includes(spec)) config.packs.push(spec);
+export function record(holder: PackHolder, spec: string, pack: Pack, answers: Selections): void {
+  if (!holder.packs.includes(spec)) holder.packs.push(spec);
   if (Object.keys(answers).length > 0) {
-    config.packOptions = { ...config.packOptions, [pack.name]: answers };
+    holder.packOptions = { ...holder.packOptions, [pack.name]: answers };
   }
+}
+
+/**
+ * What a pack is attached to: this repository, or one it coordinates. Each
+ * keeps its own packs, answers and checks, so two apps on the same stack may
+ * answer a pack's questions differently.
+ */
+export interface PackHolder {
+  packs: string[];
+  packOptions: Record<string, Selections>;
+  checks: CheckConfig[];
+}
+
+/** The holder `--repo <name>` names, or the configuration itself. */
+export function packHolder(config: Config, repo: string | null): PackHolder {
+  if (repo === null) return config;
+  const repository = config.repositories[repo];
+  if (!repository) {
+    const known = Object.keys(config.repositories);
+    throw new CliError(
+      `There is no repository named "${repo}".`,
+      64,
+      known.length > 0 ? `Repositories: ${known.join(', ')}.` : 'No repositories are configured under `repositories:`.',
+    );
+  }
+  return repository;
 }
