@@ -7,9 +7,11 @@ A team of people and a swarm of agents share one backlog, one plan format, and o
 Language and framework agnostic. Each repository's conventions are researched from its own code into a rule set; packs are optional baselines.
 
 ```bash
-npm install -D collab-swarm
+npm install -D github:kywsta/collab-swarm#v0.2.0
 npx collab-swarm init
 ```
+
+collab-swarm is not on npm yet: install a release tag from GitHub, and upgrade by naming a newer one. The package builds itself on install.
 
 ---
 
