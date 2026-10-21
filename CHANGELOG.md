@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
+- **Installable from a Git tag.** The package is not on npm yet, and `dist/` is not committed, so installing it from GitHub gave a package with no CLI. A `prepare` script now builds it on install, which also covers `npm pack` and `npm publish`: `npm install -D github:kywsta/collab-swarm#v0.2.0`.
 - **Changed requirements are traced to the work they reach.** A new BRD version or a change request used to mean re-reading the whole backlog by hand, and a plan already in flight could be finished against requirements nobody wanted any more without anything noticing.
   - **`npx collab-swarm impact`.** Diffs the sources since the delivery plan was last committed (or `--since <ref>`), finds the heading each changed line falls under, and matches those against every row's `Sources` cell. It sorts the rows it reaches into delivered, in progress and not started, sets apart rows that cite a changed document but none of its changed sections, and lists the changes no row cites. A citation may be a path, a file name or a document id (`PRD-02`, `PRD 2`), with `§7.4`, `#anchor` or a quoted heading; one that no longer resolves is reported. `--json` for agents. Read-only.
   - **`sources_sha` in `plan.yml`.** The commit whose sources a plan's requirements were read from. `claim` and `plan` set it to where the plan starts; `deliver-change` sets it again whenever it writes or revises the requirements. `impact` lists every plan in flight whose cited sources have since changed on the default branch, and `validate` warns on the plan itself, so its holder hears about it on resume rather than at review. `validate` asks for it on an unfinished plan that has requirements but none, and rejects one that is not a SHA.
