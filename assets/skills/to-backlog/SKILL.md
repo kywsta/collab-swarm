@@ -93,12 +93,12 @@ Done when the file holds the milestones, the register, the gate tracker and the 
 ## 6. Verify and report
 
 ```bash
-npx collab-swarm status      # every row, its state, and why a blocked row is blocked
-npx collab-swarm next        # what the swarm would be offered first
+npx collab-swarm status --working-tree  # every row, its state, and why a blocked row is blocked
+npx collab-swarm next --working-tree    # what the swarm would be offered first
 npx collab-swarm validate
 ```
 
-`status` is the proof: it reads the file back the way every agent will. A row missing from its output has a malformed table or sits under no milestone heading; a row blocked for a reason you did not intend has a gate, decision or dependency cell that says more than you meant.
+`status` is the proof: it reads the file back the way every agent will once it merges. Without `--working-tree` the board reads the backlog on the default branch, so it shows your edits only after they land there. A row missing from its output has a malformed table or sits under no milestone heading; a row blocked for a reason you did not intend has a gate, decision or dependency cell that says more than you meant.
 
 Report in [plain names](../../workflow/WORKFLOW.md#plain-names): the milestones and what each demonstrates, how many rows each lane can start now, the gates that hold work up with what each waits for and who owns it, the questions still to be answered, and the hand-offs between lanes. Ids trail in parentheses; the sentence must still make sense without them.
 

@@ -98,6 +98,7 @@ ${style.bold('Deliver')}
 
 ${style.bold('Options')}
   --no-fetch               Read the board without contacting the remote
+  --working-tree           status, next: read this checkout's backlog, to check a draft before it merges
   --json                   Machine-readable output where supported
   --options k=v,k=v        Answer a pack's questions without prompting
   --yes                    Accept defaults without prompting

@@ -224,6 +224,8 @@ npx collab-swarm doctor                  # what is installed, stale, or missing
 
 `status`, `next`, `repos`, `rules`, `history`, `impact`, `packs`, `steps` and `validate` accept `--json`.
 
+The board reads the backlog, decisions and history — and the settings in `collab-swarm.yml` that locate them — from the remote's default branch, where claims are cut from, so every checkout sees the same one however far behind it is; `status` and `next` say when this checkout is behind, or when a fetch failed. `--working-tree` reads this checkout's backlog instead, to check a draft before it merges.
+
 ## The backlog
 
 A Markdown file your team edits — or asks an agent to write from your product documents (`to-backlog`). Columns are matched **by header name**, so name and order them however you like; only `Slug` and `Title` are required.

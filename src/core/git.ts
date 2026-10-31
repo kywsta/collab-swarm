@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export interface GitResult {
   ok: boolean;
@@ -58,8 +60,48 @@ export class Git {
     );
   }
 
+  /**
+   * A failed fetch still empties `FETCH_HEAD`, which would lose when the last
+   * one succeeded, so it is put back as it was.
+   */
   fetch(remote: string): boolean {
-    return this.run(['fetch', '--prune', '--quiet', remote]).ok;
+    const head = this.fetchHead();
+    let saved: { text: Buffer; atime: Date; mtime: Date } | null = null;
+    try {
+      if (head !== null) {
+        const { atime, mtime } = statSync(head);
+        saved = { text: readFileSync(head), atime, mtime };
+      }
+    } catch {
+      /* never fetched */
+    }
+    const fetched = this.run(['fetch', '--prune', '--quiet', remote]).ok;
+    if (!fetched && head !== null && saved !== null && saved.text.length > 0) {
+      try {
+        writeFileSync(head, saved.text);
+        utimesSync(head, saved.atime, saved.mtime);
+      } catch {
+        /* the time is a courtesy; the failure is still reported */
+      }
+    }
+    return fetched;
+  }
+
+  private fetchHead(): string | null {
+    const path = this.maybe(['rev-parse', '--git-path', 'FETCH_HEAD']);
+    return path === null ? null : resolve(this.cwd, path.trim());
+  }
+
+  /** When this checkout last fetched something, from `FETCH_HEAD`, or null when it never has. */
+  fetchedAt(): Date | null {
+    const head = this.fetchHead();
+    if (head === null) return null;
+    try {
+      const stat = statSync(head);
+      return stat.size > 0 ? stat.mtime : null;
+    } catch {
+      return null;
+    }
   }
 
   hasRemote(remote: string): boolean {
@@ -72,6 +114,17 @@ export class Git {
   /** File content at a ref, or null when the path does not exist there. */
   show(ref: string, path: string): string | null {
     return this.maybe(['show', `${ref}:${path}`]);
+  }
+
+  /** Whether a ref names a commit here. */
+  hasCommit(ref: string): boolean {
+    return this.maybe(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]) !== null;
+  }
+
+  /** Commits in `tip` that `base` does not have, or null when either does not exist. */
+  countAhead(base: string, tip: string): number | null {
+    const count = this.maybe(['rev-list', '--count', `${base}..${tip}`]);
+    return count === null ? null : Number.parseInt(count.trim(), 10) || 0;
   }
 
   /** Merge base of HEAD and a ref, for a standalone review base. */

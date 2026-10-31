@@ -72,7 +72,7 @@ Use `to-backlog` to put the feature on the board: one row per vertical outcome, 
 
 A capability nobody can build yet still gets its rows, blocked by a named gate with an owner, so the wait is visible to everyone instead of living in one person's head.
 
-Done when the feature is one or more register rows, and `npx collab-swarm status` shows each as available, or blocked for exactly the reason intended.
+Done when the feature is one or more register rows, and `npx collab-swarm status --working-tree` shows each as available, or blocked for exactly the reason intended. The flag reads the backlog as edited here; plain `status` reads the default branch's, which has none of these rows until they merge.
 
 ## 6. Report and hand off
 

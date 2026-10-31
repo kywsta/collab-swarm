@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import type { GitConfig, RepositoryConfig } from '../config.js';
 import { exists, listDirs, readText, writeText } from '../util/fs.js';
 import { asDict, asString, isSlug, parseYaml } from '../util/yaml.js';
+import { unverifiableClaim, type FetchFailure } from './freshness.js';
 import { Git } from './git.js';
 import { countsAsDone, historyAt } from './history.js';
 import { newPlan, parsePlanRepositories, serializePlan, type PlanRepository } from './plan.js';
@@ -110,17 +111,44 @@ export class Claims {
     return `${this.git_config.remote}/${this.git_config.defaultBranch}`;
   }
 
-  /** Every claim Git knows about, after at most one fetch. */
-  read(options: { fetch?: boolean } = {}): Claim[] {
-    if (options.fetch !== false) {
-      for (const repository of this.handles.values()) {
-        if (repository.checkedOut) repository.fetch();
+  /**
+   * Fetches this repository and every code repository checked out here, and
+   * reports each one that has a remote but could not be fetched: its refs, and
+   * so the board, are only as current as its last fetch.
+   */
+  fetch(): FetchFailure[] {
+    const own = this.fetchOwn();
+    return [...(own === null ? [] : [own]), ...this.fetchRepositories()];
+  }
+
+  /** Fetches this repository alone; the failure, or null. */
+  fetchOwn(): FetchFailure | null {
+    const remote = this.git_config.remote;
+    if (this.git.available && this.git.hasRemote(remote) && !this.git.fetch(remote)) {
+      return { repository: null, remote, lastFetchedAt: this.git.fetchedAt() };
+    }
+    return null;
+  }
+
+  /** Fetches each code repository checked out here; the ones that failed. */
+  fetchRepositories(): FetchFailure[] {
+    const failures: FetchFailure[] = [];
+    for (const repository of this.handles.values()) {
+      if (repository.checkedOut && !repository.fetch()) {
+        failures.push({
+          repository: repository.name,
+          remote: repository.config.remote,
+          lastFetchedAt: repository.git.fetchedAt(),
+        });
       }
     }
+    return failures;
+  }
+
+  /** Every claim Git knows about, after at most one fetch. */
+  read(options: { fetch?: boolean } = {}): Claim[] {
+    if (options.fetch !== false) this.fetch();
     if (!this.git.available) return this.localClaims(new Set());
-    if (options.fetch !== false && this.git.hasRemote(this.git_config.remote)) {
-      this.git.fetch(this.git_config.remote);
-    }
     const claims = [...this.branchClaims(), ...this.mainClaims()];
     const known = new Set(claims.map((claim) => claim.slug));
     const compacted = this.historyClaims(known);
@@ -214,16 +242,41 @@ export class Claims {
       }));
   }
 
+  /**
+   * A plan here that the default branch once held and has since removed —
+   * abandoned, or dropped — left over from before this checkout fell behind.
+   * Read as unpushed work, it would hold its row as in progress.
+   */
+  private removedFromDefault(slug: string): boolean {
+    if (!this.git.available) return false;
+    const ref = this.mainRef();
+    const path = this.planPath(slug);
+    if (!this.git.hasCommit(ref) || this.git.show(ref, path) !== null) return false;
+    if (this.git.hasCommit(`${this.git_config.remote}/${this.branchOf(slug)}`)) return false;
+    return this.git.text(['log', '-1', '--format=%H', ref, '--', path]).trim() !== '';
+  }
+
+  private localPlanSlugs(): string[] {
+    const dir = join(this.root, this.plansDir);
+    if (!exists(dir)) return [];
+    return listDirs(dir).filter((slug) => isSlug(slug) && exists(join(dir, slug, 'plan.yml')));
+  }
+
+  /** Plan directories here that the default branch has since removed; the board leaves them out. */
+  removedPlans(): string[] {
+    return this.localPlanSlugs()
+      .filter((slug) => this.removedFromDefault(slug))
+      .map((slug) => `${this.plansDir}/${slug}`);
+  }
+
   /** Plans that exist in this checkout but nowhere on the remote. */
   private localClaims(known: Set<string>): Claim[] {
     const dir = join(this.root, this.plansDir);
-    if (!exists(dir)) return [];
     const holder = this.git.available ? this.git.userName : 'you';
     const claims: Claim[] = [];
-    for (const slug of listDirs(dir)) {
-      if (known.has(slug) || !isSlug(slug)) continue;
+    for (const slug of this.localPlanSlugs()) {
+      if (known.has(slug) || this.removedFromDefault(slug)) continue;
       const file = join(dir, slug, 'plan.yml');
-      if (!exists(file)) continue;
       const plan = readPlanState(readText(file));
       claims.push({
         slug,
@@ -300,7 +353,10 @@ export class Claims {
 
     const remote = this.git_config.remote;
     const hasRemote = this.git.hasRemote(remote);
-    if (options.fetch !== false && hasRemote) this.git.fetch(remote);
+    if (options.fetch !== false && hasRemote && !this.git.fetch(remote)) {
+      const failure = { repository: null, remote, lastFetchedAt: this.git.fetchedAt() };
+      return { ok: false, message: unverifiableClaim(slug, failure) };
+    }
 
     const branch = this.branchOf(slug);
     const holder = hasRemote ? this.holderOf(slug) : null;
