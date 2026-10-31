@@ -1,6 +1,6 @@
 {
   "name": "collab-swarm",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Spec-driven delivery workflow for humans and coding agents working as a swarm. Language and framework agnostic.",
   "keywords": ["agents", "ai", "claude-code", "codex", "cursor", "opencode", "antigravity", "skills", "workflow", "spec-driven", "tdd"],
   "license": "MIT",

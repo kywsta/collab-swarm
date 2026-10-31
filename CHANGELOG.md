@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - **The board reads the default branch, and says when it cannot be trusted.** Claims were read from the remote, but the backlog, the decisions source and the delivery history were read from the working tree, so a checkout behind the default branch — a reused worktree, a long-lived feature branch — showed a backlog from before the project changed next to today's claims, and a fetch that failed left the board silently out of date.
   - **One source for the board.** `status`, `next` and `claim` read all three files from `<remote>/<defaultBranch>`, the branch claims are cut from and read against, after fetching. Only outside Git, or with no such remote branch, do they read this checkout's copies. A backlog being drafted here does not reach the board until it merges; the board says this checkout's copy differs.
