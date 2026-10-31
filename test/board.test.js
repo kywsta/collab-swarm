@@ -8,6 +8,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { Claims } from '../dist/core/claims.js';
 import { parseConfig } from '../dist/config.js';
+import { newPlan, serializePlan } from '../dist/core/plan.js';
 import { writeText } from '../dist/util/fs.js';
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'cli.js');
@@ -71,6 +72,8 @@ describe('the board in a checkout behind the default branch', () => {
     git(current, 'remote', 'add', 'origin', origin);
     writeText(join(current, 'collab-swarm.yml'), CONFIG);
     writeText(join(current, 'backlog.md'), backlog(['old-row', 'kept-row']));
+    // Started on the default branch, and later abandoned there.
+    writeText(join(current, 'plans', 'kept-row', 'plan.yml'), serializePlan(newPlan('kept-row', 'Kept row')));
     git(current, 'add', '-A');
     git(current, 'commit', '--quiet', '-m', 'Plan the work');
     git(current, 'push', '--quiet', '-u', 'origin', 'main');
@@ -79,6 +82,7 @@ describe('the board in a checkout behind the default branch', () => {
 
     // The project is restructured: the backlog moves, one row retired, one added.
     git(current, 'rm', '--quiet', 'backlog.md');
+    git(current, 'rm', '-r', '--quiet', 'plans/kept-row');
     writeText(join(current, 'docs', 'backlog.md'), backlog(['kept-row', 'new-row']));
     writeText(join(current, 'collab-swarm.yml'), CONFIG.replace('backlog: backlog.md', 'backlog: docs/backlog.md'));
     git(current, 'add', '-A');
@@ -129,6 +133,25 @@ describe('the board in a checkout behind the default branch', () => {
       assert.ok(json.notices.some((notice) => notice.includes('behind origin/main')));
     }
     assert.deepEqual(JSON.parse(swarm(current, 'history', '--json').stdout).notices, []);
+  });
+
+  it('leaves out a plan the default branch has removed since, instead of calling it unpushed work', () => {
+    const json = JSON.parse(swarm(stale, 'status', '--json').stdout);
+    assert.equal(json.rows.find((row) => row.slug === 'kept-row').state, 'available');
+    assert.deepEqual(json.source.removedPlans, ['plans/kept-row']);
+    const text = swarm(stale, 'status').stdout;
+    assert.match(text, /plans\/kept-row is in this checkout but was removed from origin\/main; the board leaves it out\./);
+    assert.doesNotMatch(text, /Unpushed plans/);
+
+    // A plan that was never on the default branch is still this checkout's unpushed work.
+    writeText(join(current, 'plans', 'new-row', 'plan.yml'), serializePlan(newPlan('new-row', 'New row')));
+    try {
+      const fresh = JSON.parse(swarm(current, 'status', '--json').stdout);
+      assert.equal(fresh.rows.find((row) => row.slug === 'new-row').ref, 'local');
+      assert.deepEqual(fresh.source.removedPlans, []);
+    } finally {
+      rmSync(join(current, 'plans'), { recursive: true, force: true });
+    }
   });
 
   it('refuses to claim a row only the stale backlog still has', () => {

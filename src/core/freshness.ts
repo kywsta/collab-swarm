@@ -23,6 +23,8 @@ export interface Freshness {
   configDiffers: string[];
   /** The working tree's backlog is not the one the board reads. */
   backlogDiffers: boolean;
+  /** Plan directories here that `ref` once held and has since removed. */
+  removedPlans: string[];
   fetchFailures: FetchFailure[];
 }
 
@@ -54,6 +56,13 @@ export function notices(freshness: Freshness, backlog: string | null): string[] 
     lines.push(
       `This checkout's ${backlog} differs from ${ref}'s; the board reads ${ref}'s. ` +
         `Pass --working-tree to read this checkout's.`,
+    );
+  }
+  if (ref !== null && freshness.removedPlans.length > 0) {
+    const one = freshness.removedPlans.length === 1;
+    lines.push(
+      `${freshness.removedPlans.join(', ')} ${one ? 'is' : 'are'} in this checkout but ${one ? 'was' : 'were'} ` +
+        `removed from ${ref}; the board leaves ${one ? 'it' : 'them'} out.`,
     );
   }
   return lines;

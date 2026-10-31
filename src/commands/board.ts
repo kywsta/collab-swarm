@@ -152,6 +152,7 @@ export function readBoard(
       behind,
       configDiffers: settings.differs,
       backlogDiffers: loaded.backlogDiffers,
+      removedPlans: claims.removedPlans(),
       fetchFailures,
     },
   };
@@ -168,6 +169,7 @@ export function freshnessJson(read: BoardRead | null) {
       behind: freshness.behind,
       configDiffers: freshness.configDiffers,
       backlogDiffers: freshness.backlogDiffers,
+      removedPlans: freshness.removedPlans,
     },
     fetchFailures: freshness.fetchFailures.map((failure) => ({
       repository: failure.repository,

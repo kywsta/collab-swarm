@@ -9,8 +9,9 @@
   - **A checkout behind the default branch is named.** `status` and `next` open with "This checkout is N commits behind origin/main; the board reads origin/main.", and `doctor` warns with the command that catches up: `git merge --ff-only origin/main` when the branch has no commits of its own.
   - **A failed fetch is reported.** The board says it is as of the last fetch, with that fetch's time, and names each code repository whose fetch failed, since their merge state is as old. `claim` refuses when its fetch fails, since a rival claim would be invisible, unless `--no-fetch` was passed. A failed fetch no longer erases the time of the last good one in `FETCH_HEAD`.
   - **`--working-tree` checks a draft.** `status` and `next` read this checkout's backlog with it, labelled as such, so `to-backlog`, `new-feature` and `compact-history` verify their edits the way the board will read them once merged. `claim` ignores it: a claim is cut from the default branch.
+  - **A plan the default branch has since removed is not unpushed work.** A stale checkout still holding the directory of a plan abandoned or dropped on the default branch showed it as an unpushed claim, holding its row in progress. The board leaves such a directory out and names it.
   - `history` and `impact` print the same notices, since they read the board too.
-  - `--json` carries all of it, in `status`, `next`, `history` and `impact`: `source` (`ref`, `workingTree`, `behind`, `configDiffers`, `backlogDiffers`), `fetchFailures` (`repository`, `remote`, `lastFetchedAt`) and `notices`, the lines the text output prints.
+  - `--json` carries all of it, in `status`, `next`, `history` and `impact`: `source` (`ref`, `workingTree`, `behind`, `configDiffers`, `backlogDiffers`, `removedPlans`), `fetchFailures` (`repository`, `remote`, `lastFetchedAt`) and `notices`, the lines the text output prints.
 
 ## 0.2.0
 

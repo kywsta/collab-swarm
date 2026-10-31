@@ -242,16 +242,41 @@ export class Claims {
       }));
   }
 
+  /**
+   * A plan here that the default branch once held and has since removed —
+   * abandoned, or dropped — left over from before this checkout fell behind.
+   * Read as unpushed work, it would hold its row as in progress.
+   */
+  private removedFromDefault(slug: string): boolean {
+    if (!this.git.available) return false;
+    const ref = this.mainRef();
+    const path = this.planPath(slug);
+    if (!this.git.hasCommit(ref) || this.git.show(ref, path) !== null) return false;
+    if (this.git.hasCommit(`${this.git_config.remote}/${this.branchOf(slug)}`)) return false;
+    return this.git.text(['log', '-1', '--format=%H', ref, '--', path]).trim() !== '';
+  }
+
+  private localPlanSlugs(): string[] {
+    const dir = join(this.root, this.plansDir);
+    if (!exists(dir)) return [];
+    return listDirs(dir).filter((slug) => isSlug(slug) && exists(join(dir, slug, 'plan.yml')));
+  }
+
+  /** Plan directories here that the default branch has since removed; the board leaves them out. */
+  removedPlans(): string[] {
+    return this.localPlanSlugs()
+      .filter((slug) => this.removedFromDefault(slug))
+      .map((slug) => `${this.plansDir}/${slug}`);
+  }
+
   /** Plans that exist in this checkout but nowhere on the remote. */
   private localClaims(known: Set<string>): Claim[] {
     const dir = join(this.root, this.plansDir);
-    if (!exists(dir)) return [];
     const holder = this.git.available ? this.git.userName : 'you';
     const claims: Claim[] = [];
-    for (const slug of listDirs(dir)) {
-      if (known.has(slug) || !isSlug(slug)) continue;
+    for (const slug of this.localPlanSlugs()) {
+      if (known.has(slug) || this.removedFromDefault(slug)) continue;
       const file = join(dir, slug, 'plan.yml');
-      if (!exists(file)) continue;
       const plan = readPlanState(readText(file));
       claims.push({
         slug,
