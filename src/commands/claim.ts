@@ -2,8 +2,9 @@ import { flagBool, type Args } from '../cli.js';
 import { PROGRAM } from '../util/program.js';
 import { loadConfig } from '../config.js';
 import { Claims } from '../core/claims.js';
+import { unverifiableClaim } from '../core/freshness.js';
 import { CliError, ok, out, style } from '../util/log.js';
-import { buildBoard } from './board.js';
+import { readBoard } from './board.js';
 
 export async function run(args: Args): Promise<number> {
   const slug = args.positional[0];
@@ -13,7 +14,10 @@ export async function run(args: Args): Promise<number> {
 
   const { config, root } = loadConfig();
   const fetch = !flagBool(args, 'no-fetch');
-  const board = buildBoard(root, config, { fetch });
+  const { board, freshness } = readBoard(root, config, { fetch });
+  // Without a fetch, a rival claim pushed since the last one is invisible here.
+  const failed = freshness.fetchFailures.find((failure) => failure.repository === null);
+  if (failed) throw new CliError(unverifiableClaim(slug, failed), 1);
 
   const row = board.register.row(slug);
   const reason = board.whyNotAvailable(slug);

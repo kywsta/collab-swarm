@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { VERSION, type Args } from '../cli.js';
 import { PROGRAM } from '../util/program.js';
 import { CONFIG_FILE, inRoot, loadConfig } from '../config.js';
+import { behindBy } from '../core/freshness.js';
 import { Git } from '../core/git.js';
 import { Repository } from '../core/repositories.js';
 import { ROOT_SCOPE, ruleSetStatus, scopes } from '../core/rulesets.js';
@@ -41,6 +42,20 @@ export async function run(_args: Args): Promise<number> {
     );
   } else {
     say('ok', `Git remote "${config.git.remote}", default branch "${config.git.defaultBranch}"`);
+    // The board reads the default branch, but this checkout's skills, rules and
+    // configuration are whatever it last pulled.
+    const main = `${config.git.remote}/${config.git.defaultBranch}`;
+    const behind = git.countAhead('HEAD', main);
+    if (behind) {
+      const own = git.countAhead(main, 'HEAD') ?? 0;
+      say(
+        'warn',
+        `${behindBy(main, behind)}; the board reads ${main}`,
+        own === 0
+          ? `Catch up: git merge --ff-only ${main}`
+          : `This branch has ${own} commit${own === 1 ? '' : 's'} of its own. Catch up: git merge ${main}`,
+      );
+    }
   }
 
   for (const repository of Object.values(config.repositories)) {

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **The board reads the default branch, and says when it cannot be trusted.** Claims were read from the remote, but the backlog, the decisions source and the delivery history were read from the working tree, so a checkout behind the default branch — a reused worktree, a long-lived feature branch — showed a backlog from before the project changed next to today's claims, and a fetch that failed left the board silently out of date.
+  - **One source for the board.** `status`, `next` and `claim` read all three files from `<remote>/<defaultBranch>`, the branch claims are cut from and read against, after fetching. Only outside Git, or with no such remote branch, do they read this checkout's copies. A backlog being drafted here does not reach the board until it merges; the board says this checkout's copy differs.
+  - **`claim` checks the row against that backlog.** A row only a stale local backlog still has can no longer be claimed onto a branch cut from a default branch that does not have it.
+  - **A checkout behind the default branch is named.** `status` and `next` open with "This checkout is N commits behind origin/main; the board reads origin/main.", and `doctor` warns with the command that catches up: `git merge --ff-only origin/main` when the branch has no commits of its own.
+  - **A failed fetch is reported.** The board says it is as of the last fetch, with that fetch's time, and names each code repository whose fetch failed, since their merge state is as old. `claim` refuses when its fetch fails, since a rival claim would be invisible, unless `--no-fetch` was passed. A failed fetch no longer erases the time of the last good one in `FETCH_HEAD`.
+  - `--json` carries all of it: `source` (`ref`, `behind`, `backlogDiffers`), `fetchFailures` (`repository`, `remote`, `lastFetchedAt`) and `notices`, the lines the text output prints.
+
 ## 0.2.0
 
 - **Installable from a Git tag.** The package is not on npm yet, and `dist/` is not committed, so installing it from GitHub gave a package with no CLI. A `prepare` script now builds it on install, which also covers `npm pack` and `npm publish`: `npm install -D github:kywsta/collab-swarm#v0.2.0`.

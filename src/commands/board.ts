@@ -1,47 +1,94 @@
+import { isAbsolute } from 'node:path';
 import { flagBool, flagString, type Args } from '../cli.js';
 import { inRoot, loadConfig, type Config } from '../config.js';
 import { Board, normalizeLane } from '../core/board.js';
 import { Claims } from '../core/claims.js';
+import { notices, type Freshness } from '../core/freshness.js';
+import { Git } from '../core/git.js';
 import { historyPath } from '../core/history.js';
 import { Register } from '../core/register.js';
 import { renderNext, renderStatus } from '../core/render.js';
 import { readTextOrNull } from '../util/fs.js';
-import { CliError, out } from '../util/log.js';
+import { CliError, out, style } from '../util/log.js';
+
+export interface LoadedRegister {
+  register: Register;
+  /** The ref the files were read from, or null when they were read from this checkout. */
+  ref: string | null;
+  /** The working tree's backlog is not the one the register was read from. */
+  backlogDiffers: boolean;
+}
+
+const sameText = (a: string, b: string) => a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n');
 
 /**
  * Loads the register from the configured backlog, plus a decisions source when
  * declared, plus the questions the delivery history records as settled — a
  * question retired from the backlog stays answered for any row still citing it.
+ *
+ * All three are read from the default branch on the remote, as claims are and
+ * as a claim's branch is cut: a checkout behind it, or one drafting backlog
+ * edits, would otherwise offer rows nobody else can see. Only outside Git, or
+ * with no such remote branch, is this checkout's copy the register.
  */
-export function loadRegister(root: string, config: Config): Register {
-  if (!config.backlog) return Register.empty();
-  const backlog = readTextOrNull(inRoot(root, config.backlog));
+export function loadRegister(root: string, config: Config): LoadedRegister {
+  if (!config.backlog) return { register: Register.empty(), ref: null, backlogDiffers: false };
+  const git = new Git(root);
+  const main = `${config.git.remote}/${config.git.defaultBranch}`;
+  const ref = git.available && git.hasCommit(main) ? main : null;
+  const fromDisk = (path: string) => readTextOrNull(inRoot(root, path));
+  // `./` resolves the path from the root, which need not be the top of the repository.
+  const read = (path: string) => (ref === null || isAbsolute(path) ? fromDisk(path) : git.show(ref, `./${path}`));
+
+  const backlog = read(config.backlog);
   if (backlog === null) {
     throw new CliError(
-      `The configured backlog ${config.backlog} does not exist, so there is no board to read.`,
+      ref === null
+        ? `The configured backlog ${config.backlog} does not exist, so there is no board to read.`
+        : `The configured backlog ${config.backlog} is not on ${ref}, so there is no board to read.`,
       1,
-      'Create it, or set `backlog:` in collab-swarm.yml to the file holding the feature register.',
+      ref === null
+        ? 'Create it, or set `backlog:` in collab-swarm.yml to the file holding the feature register.'
+        : `Merge it into ${config.git.defaultBranch}: the board, and every claim, reads it from there.`,
     );
   }
   const decisionsSource = config.sources.decisions;
   const decisions = decisionsSource
-    ? (decisionsSource.paths
-        .map((path) => readTextOrNull(inRoot(root, path)))
-        .find((text) => text !== null) ?? '')
+    ? (decisionsSource.paths.map((path) => read(path)).find((text) => text !== null) ?? '')
     : '';
-  const history = readTextOrNull(inRoot(root, historyPath(config.plans))) ?? '';
-  return Register.parse(backlog, `${decisions}\n\n${history}`);
+  const history = read(historyPath(config.plans)) ?? '';
+  const local = ref === null ? null : fromDisk(config.backlog);
+  return {
+    register: Register.parse(backlog, `${decisions}\n\n${history}`),
+    ref,
+    backlogDiffers: local !== null && !sameText(local, backlog),
+  };
+}
+
+export interface BoardRead {
+  board: Board;
+  freshness: Freshness;
+}
+
+/** The board, and how current it is. */
+export function readBoard(root: string, config: Config, options: { fetch?: boolean } = {}): BoardRead {
+  const claims = new Claims(root, config.git, config.plans, config.repositories);
+  // Fetch first: the register is read from the remote's default branch too.
+  const fetchFailures = options.fetch === false ? [] : claims.fetch();
+  const loaded = loadRegister(root, config);
+  const board = Board.build(loaded.register, claims.read({ fetch: false }), config.git.defaultBranch);
+  const behind = loaded.ref === null ? 0 : (new Git(root).countAhead('HEAD', loaded.ref) ?? 0);
+  return { board, freshness: { ref: loaded.ref, behind, backlogDiffers: loaded.backlogDiffers, fetchFailures } };
 }
 
 export function buildBoard(root: string, config: Config, options: { fetch?: boolean } = {}): Board {
-  const register = loadRegister(root, config);
-  const claims = new Claims(root, config.git, config.plans, config.repositories).read(options);
-  return Board.build(register, claims, config.git.defaultBranch);
+  return readBoard(root, config, options).board;
 }
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const board = buildBoard(root, config, { fetch: !flagBool(args, 'no-fetch') });
+  const { board, freshness } = readBoard(root, config, { fetch: !flagBool(args, 'no-fetch') });
+  const warnings = notices(freshness, config.backlog);
   const lane = normalizeLane(flagString(args, 'lane'), board.register);
   const count = Number.parseInt(flagString(args, 'count') ?? '3', 10) || 3;
 
@@ -64,6 +111,13 @@ export async function run(args: Args): Promise<number> {
             blockers: row.blockers,
           })),
           proposals: board.proposals({ lane, count }).map((row) => row.row.slug),
+          source: { ref: freshness.ref, behind: freshness.behind, backlogDiffers: freshness.backlogDiffers },
+          fetchFailures: freshness.fetchFailures.map((failure) => ({
+            repository: failure.repository,
+            remote: failure.remote,
+            lastFetchedAt: failure.lastFetchedAt?.toISOString() ?? null,
+          })),
+          notices: warnings,
         },
         null,
         2,
@@ -74,6 +128,8 @@ export async function run(args: Args): Promise<number> {
 
   const options = { lane, count, claimCommand: 'npx collab-swarm claim <slug>' };
   out('');
+  for (const warning of warnings) out(`${style.yellow('!')} ${warning}`);
+  if (warnings.length > 0) out('');
   out(args.command === 'status' ? renderStatus(board, options) : renderNext(board, options));
   out('');
   return 0;

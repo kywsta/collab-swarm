@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import type { GitConfig, RepositoryConfig } from '../config.js';
 import { exists, listDirs, readText, writeText } from '../util/fs.js';
 import { asDict, asString, isSlug, parseYaml } from '../util/yaml.js';
+import { unverifiableClaim, type FetchFailure } from './freshness.js';
 import { Git } from './git.js';
 import { countsAsDone, historyAt } from './history.js';
 import { newPlan, parsePlanRepositories, serializePlan, type PlanRepository } from './plan.js';
@@ -110,17 +111,33 @@ export class Claims {
     return `${this.git_config.remote}/${this.git_config.defaultBranch}`;
   }
 
-  /** Every claim Git knows about, after at most one fetch. */
-  read(options: { fetch?: boolean } = {}): Claim[] {
-    if (options.fetch !== false) {
-      for (const repository of this.handles.values()) {
-        if (repository.checkedOut) repository.fetch();
+  /**
+   * Fetches this repository and every code repository checked out here, and
+   * reports each one that has a remote but could not be fetched: its refs, and
+   * so the board, are only as current as its last fetch.
+   */
+  fetch(): FetchFailure[] {
+    const failures: FetchFailure[] = [];
+    const remote = this.git_config.remote;
+    if (this.git.available && this.git.hasRemote(remote) && !this.git.fetch(remote)) {
+      failures.push({ repository: null, remote, lastFetchedAt: this.git.fetchedAt() });
+    }
+    for (const repository of this.handles.values()) {
+      if (repository.checkedOut && !repository.fetch()) {
+        failures.push({
+          repository: repository.name,
+          remote: repository.config.remote,
+          lastFetchedAt: repository.git.fetchedAt(),
+        });
       }
     }
+    return failures;
+  }
+
+  /** Every claim Git knows about, after at most one fetch. */
+  read(options: { fetch?: boolean } = {}): Claim[] {
+    if (options.fetch !== false) this.fetch();
     if (!this.git.available) return this.localClaims(new Set());
-    if (options.fetch !== false && this.git.hasRemote(this.git_config.remote)) {
-      this.git.fetch(this.git_config.remote);
-    }
     const claims = [...this.branchClaims(), ...this.mainClaims()];
     const known = new Set(claims.map((claim) => claim.slug));
     const compacted = this.historyClaims(known);
@@ -300,7 +317,10 @@ export class Claims {
 
     const remote = this.git_config.remote;
     const hasRemote = this.git.hasRemote(remote);
-    if (options.fetch !== false && hasRemote) this.git.fetch(remote);
+    if (options.fetch !== false && hasRemote && !this.git.fetch(remote)) {
+      const failure = { repository: null, remote, lastFetchedAt: this.git.fetchedAt() };
+      return { ok: false, message: unverifiableClaim(slug, failure) };
+    }
 
     const branch = this.branchOf(slug);
     const holder = hasRemote ? this.holderOf(slug) : null;

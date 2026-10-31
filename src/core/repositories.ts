@@ -88,8 +88,9 @@ export class Repository {
     return `${this.config.remote}/${branch}`;
   }
 
+  /** Fetches its remote. False only when it has one and the fetch failed. */
   fetch(): boolean {
-    return this.git.hasRemote(this.config.remote) && this.git.fetch(this.config.remote);
+    return !this.git.hasRemote(this.config.remote) || this.git.fetch(this.config.remote);
   }
 
   /** The full SHA a ref or abbreviation names, or null. */
