@@ -3,7 +3,7 @@ import { loadConfig } from '../config.js';
 import type { Board } from '../core/board.js';
 import { survey, type Candidate, type Survey } from '../core/history.js';
 import { CliError, out, style } from '../util/log.js';
-import { buildBoard } from './board.js';
+import { freshnessJson, printNotices, readBoard, type BoardRead } from './board.js';
 import { describeProgress } from '../core/repositories.js';
 
 const date = (at: Date | null) => (at ? at.toISOString().slice(0, 10) : 'never committed');
@@ -119,14 +119,15 @@ function render(result: Survey, board: Board | null, compactCommand: string): st
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
 
-  let board: Board | null = null;
+  let read: BoardRead | null = null;
   if (config.backlog) {
     try {
-      board = buildBoard(root, config, { fetch: !flagBool(args, 'no-fetch') });
+      read = readBoard(root, config, { fetch: !flagBool(args, 'no-fetch') });
     } catch (error) {
       if (!(error instanceof CliError)) throw error;
     }
   }
+  const board: Board | null = read?.board ?? null;
 
   const result = survey(root, config, { board });
 
@@ -143,6 +144,7 @@ export async function run(args: Args): Promise<number> {
             committedAt: candidate.committedAt?.toISOString() ?? null,
           })),
           retirable: result.retirable,
+          ...freshnessJson(read),
         },
         null,
         2,
@@ -152,6 +154,7 @@ export async function run(args: Args): Promise<number> {
   }
 
   out('');
+  printNotices(read);
   out(render(result, board, '"Compact the project history"'));
   out('');
   return result.problems.length === 0 ? 0 : 1;

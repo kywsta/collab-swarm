@@ -117,6 +117,20 @@ describe('the board in a checkout behind the default branch', () => {
     assert.doesNotMatch(swarm(current, 'status').stdout, /behind/);
   });
 
+  it('says the same in history and impact, which read the board too', () => {
+    for (const command of ['history', 'impact']) {
+      const result = swarm(stale, command);
+      assert.equal(result.code, 0, result.all);
+      const first = result.stdout.split('\n').find((line) => line.trim() !== '');
+      assert.match(first, /This checkout is 1 commit behind origin\/main; the board reads origin\/main\./);
+      const json = JSON.parse(swarm(stale, command, '--json').stdout);
+      assert.equal(json.source.behind, 1);
+      assert.deepEqual(json.fetchFailures, []);
+      assert.ok(json.notices.some((notice) => notice.includes('behind origin/main')));
+    }
+    assert.deepEqual(JSON.parse(swarm(current, 'history', '--json').stdout).notices, []);
+  });
+
   it('refuses to claim a row only the stale backlog still has', () => {
     const result = swarm(stale, 'claim', 'old-row');
     assert.equal(result.code, 1, result.all);
@@ -207,6 +221,11 @@ describe('the board in a checkout behind the default branch', () => {
       assert.equal(json.fetchFailures[0].lastFetchedAt, lastFetch.toISOString());
       assert.equal(json.fetchFailures[1].lastFetchedAt, null);
       assert.ok(json.notices.some((notice) => notice.startsWith('Could not fetch origin')));
+      for (const command of ['history', 'impact']) {
+        const failures = JSON.parse(swarm(stale, command, '--json').stdout).fetchFailures;
+        assert.deepEqual(failures.map((failure) => failure.repository), [null, 'api']);
+      }
+      assert.match(swarm(stale, 'impact').stdout, /Could not fetch origin; the board is as of the last fetch/);
     });
 
     it('says nothing about fetching when asked not to fetch', () => {

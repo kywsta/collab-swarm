@@ -13,7 +13,7 @@ import {
   type SourceChange,
 } from '../core/impact.js';
 import { CliError, out, style } from '../util/log.js';
-import { buildBoard } from './board.js';
+import { freshnessJson, printNotices, readBoard, type BoardRead } from './board.js';
 
 const SHOWN_SECTIONS = 4;
 
@@ -172,14 +172,15 @@ export async function run(args: Args): Promise<number> {
     throw new CliError('This directory is not a Git repository, so there is no history to compare the sources with.');
   }
 
-  let board: Board | null = null;
+  let read: BoardRead | null = null;
   if (config.backlog) {
     try {
-      board = buildBoard(root, config, { fetch: !flagBool(args, 'no-fetch') });
+      read = readBoard(root, config, { fetch: !flagBool(args, 'no-fetch') });
     } catch (error) {
       if (!(error instanceof CliError)) throw error;
     }
   }
+  const board: Board | null = read?.board ?? null;
 
   let report: ImpactReport;
   try {
@@ -195,11 +196,18 @@ export async function run(args: Args): Promise<number> {
       const { regions: _regions, headings: _headings, ...fields } = change;
       return fields;
     };
-    out(JSON.stringify({ ...rest, changes: changes.map(plain), uncited: uncited.map(plain) }, null, 2));
+    out(
+      JSON.stringify(
+        { ...rest, changes: changes.map(plain), uncited: uncited.map(plain), ...freshnessJson(read) },
+        null,
+        2,
+      ),
+    );
     return 0;
   }
 
   out('');
+  printNotices(read);
   out(renderImpact(report, board, config));
   out('');
   return 0;

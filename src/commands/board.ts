@@ -157,8 +157,32 @@ export function readBoard(
   };
 }
 
-export function buildBoard(root: string, config: Config, options: { fetch?: boolean } = {}): Board {
-  return readBoard(root, config, options).board;
+/** What every command reading the board adds to its `--json`: how current that board is. */
+export function freshnessJson(read: BoardRead | null) {
+  if (read === null) return { source: null, fetchFailures: [], notices: [] };
+  const { freshness } = read;
+  return {
+    source: {
+      ref: freshness.ref,
+      workingTree: freshness.workingTree,
+      behind: freshness.behind,
+      configDiffers: freshness.configDiffers,
+      backlogDiffers: freshness.backlogDiffers,
+    },
+    fetchFailures: freshness.fetchFailures.map((failure) => ({
+      repository: failure.repository,
+      remote: failure.remote,
+      lastFetchedAt: failure.lastFetchedAt?.toISOString() ?? null,
+    })),
+    notices: notices(freshness, read.config.backlog),
+  };
+}
+
+/** The same notices, above a command's text output. */
+export function printNotices(read: BoardRead | null): void {
+  const lines = read === null ? [] : notices(read.freshness, read.config.backlog);
+  for (const line of lines) out(`${style.yellow('!')} ${line}`);
+  if (lines.length > 0) out('');
 }
 
 export async function run(args: Args): Promise<number> {
@@ -167,8 +191,7 @@ export async function run(args: Args): Promise<number> {
     fetch: !flagBool(args, 'no-fetch'),
     workingTree: flagBool(args, 'working-tree'),
   });
-  const { board, freshness } = read;
-  const warnings = notices(freshness, read.config.backlog);
+  const { board } = read;
   const lane = normalizeLane(flagString(args, 'lane'), board.register);
   const count = Number.parseInt(flagString(args, 'count') ?? '3', 10) || 3;
 
@@ -191,19 +214,7 @@ export async function run(args: Args): Promise<number> {
             blockers: row.blockers,
           })),
           proposals: board.proposals({ lane, count }).map((row) => row.row.slug),
-          source: {
-            ref: freshness.ref,
-            workingTree: freshness.workingTree,
-            behind: freshness.behind,
-            configDiffers: freshness.configDiffers,
-            backlogDiffers: freshness.backlogDiffers,
-          },
-          fetchFailures: freshness.fetchFailures.map((failure) => ({
-            repository: failure.repository,
-            remote: failure.remote,
-            lastFetchedAt: failure.lastFetchedAt?.toISOString() ?? null,
-          })),
-          notices: warnings,
+          ...freshnessJson(read),
         },
         null,
         2,
@@ -214,8 +225,7 @@ export async function run(args: Args): Promise<number> {
 
   const options = { lane, count, claimCommand: 'npx collab-swarm claim <slug>' };
   out('');
-  for (const warning of warnings) out(`${style.yellow('!')} ${warning}`);
-  if (warnings.length > 0) out('');
+  printNotices(read);
   out(args.command === 'status' ? renderStatus(board, options) : renderNext(board, options));
   out('');
   return 0;
