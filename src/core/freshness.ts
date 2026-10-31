@@ -15,6 +15,8 @@ export interface FetchFailure {
 export interface Freshness {
   /** The ref the register was read from, such as `origin/main`; null when it was read from this checkout. */
   ref: string | null;
+  /** The register was read from this checkout because `--working-tree` asked for it. */
+  workingTree: boolean;
   /** Commits on `ref` that this checkout's HEAD does not have. */
   behind: number;
   /** The working tree's backlog is not the one the board reads. */
@@ -35,10 +37,16 @@ export function notices(freshness: Freshness, backlog: string | null): string[] 
       ? `Could not fetch ${failure.remote}; the board is as of the last fetch${asOf(failure.lastFetchedAt)}.`
       : `Could not fetch ${failure.repository} (${failure.remote}); its merge state is as of the last fetch${asOf(failure.lastFetchedAt)}.`,
   );
+  if (freshness.workingTree) {
+    lines.push(`The board reads this checkout's ${backlog}, as --working-tree asked; nobody else sees it until it merges.`);
+  }
   const ref = freshness.ref;
   if (ref !== null && freshness.behind > 0) lines.push(`${behindBy(ref, freshness.behind)}; the board reads ${ref}.`);
   if (ref !== null && freshness.backlogDiffers) {
-    lines.push(`This checkout's ${backlog} differs from ${ref}'s; the board reads ${ref}'s.`);
+    lines.push(
+      `This checkout's ${backlog} differs from ${ref}'s; the board reads ${ref}'s. ` +
+        `Pass --working-tree to read this checkout's.`,
+    );
   }
   return lines;
 }

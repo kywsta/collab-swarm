@@ -7,7 +7,8 @@
   - **`claim` checks the row against that backlog.** A row only a stale local backlog still has can no longer be claimed onto a branch cut from a default branch that does not have it.
   - **A checkout behind the default branch is named.** `status` and `next` open with "This checkout is N commits behind origin/main; the board reads origin/main.", and `doctor` warns with the command that catches up: `git merge --ff-only origin/main` when the branch has no commits of its own.
   - **A failed fetch is reported.** The board says it is as of the last fetch, with that fetch's time, and names each code repository whose fetch failed, since their merge state is as old. `claim` refuses when its fetch fails, since a rival claim would be invisible, unless `--no-fetch` was passed. A failed fetch no longer erases the time of the last good one in `FETCH_HEAD`.
-  - `--json` carries all of it: `source` (`ref`, `behind`, `backlogDiffers`), `fetchFailures` (`repository`, `remote`, `lastFetchedAt`) and `notices`, the lines the text output prints.
+  - **`--working-tree` checks a draft.** `status` and `next` read this checkout's backlog with it, labelled as such, so `to-backlog`, `new-feature` and `compact-history` verify their edits the way the board will read them once merged. `claim` ignores it: a claim is cut from the default branch.
+  - `--json` carries all of it: `source` (`ref`, `workingTree`, `behind`, `backlogDiffers`), `fetchFailures` (`repository`, `remote`, `lastFetchedAt`) and `notices`, the lines the text output prints.
 
 ## 0.2.0
 

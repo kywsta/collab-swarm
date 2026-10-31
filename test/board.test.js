@@ -126,6 +126,22 @@ describe('the board in a checkout behind the default branch', () => {
       assert.equal(json.source.backlogDiffers, true);
       assert.equal(json.source.behind, 0);
       assert.match(swarm(current, 'status').stdout, /This checkout's backlog\.md differs from origin\/main's; the board reads origin\/main's\./);
+      assert.match(swarm(current, 'status').stdout, /--working-tree/);
+
+      // Whoever drafts it checks the draft the way the board will read it once merged.
+      const draft = JSON.parse(swarm(current, 'status', '--json', '--working-tree').stdout);
+      assert.deepEqual(draft.rows.map((row) => row.slug), ['kept-row', 'new-row', 'drafted-row']);
+      assert.equal(draft.source.ref, null);
+      assert.equal(draft.source.workingTree, true);
+      assert.equal(draft.source.backlogDiffers, false);
+      const text = swarm(current, 'next', '--working-tree');
+      assert.match(text.stdout.split('\n').find((line) => line.trim() !== ''), /reads this checkout's backlog\.md/);
+      assert.match(text.stdout, /drafted-row/);
+
+      // A claim is cut from the default branch, so it never reads a draft.
+      const claim = swarm(current, 'claim', 'drafted-row', '--working-tree');
+      assert.equal(claim.code, 1, claim.all);
+      assert.match(claim.all, /"drafted-row" is not in the feature register/);
     } finally {
       git(current, 'checkout', '--quiet', '--', 'backlog.md');
     }

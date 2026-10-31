@@ -16,7 +16,7 @@ Read `collab-swarm.yml` for `plans`, `backlog`, `sources` and the Git settings. 
 ```bash
 npx collab-swarm history          # the history, every plan directory's verdict, what the backlog can retire
 npx collab-swarm history --json   # the same, with every commit and count, for writing rows
-npx collab-swarm status --json    # the board before: the picture that must not change
+npx collab-swarm status --json --working-tree  # the board before: the picture that must not change
 ```
 
 `history` gives each directory under the plans a verdict. **Ready** is complete, held by the default branch exactly as it is here, and owes nothing. **Deferred work** is complete but still owes a deferred ticket. **Orphaned** never finished, has no backlog row, and has not been touched for weeks. **Unmerged** is complete here but not on the default branch. **Live** is in progress. It also lists the milestones whose every row is done, the gates no longer open that nothing unfinished names, and the questions answered that nothing unfinished cites. A history row it marks with ✗ names a commit that cannot give its plan back: fix that row before adding any.
@@ -103,10 +103,10 @@ Done when every compacted directory is gone, the backlog holds only what the boa
 ```bash
 npx collab-swarm validate
 npx collab-swarm history
-npx collab-swarm status --json
+npx collab-swarm status --json --working-tree
 ```
 
-`validate` must pass, and `history` must show no ✗ row and none of the compacted directories. Compare `status` with the picture from step 1: every row still in the backlog keeps its state, and every row removed was done. A row that changed state means something it depended on was retired; restore it before going further.
+`validate` must pass, and `history` must show no ✗ row and none of the compacted directories. Compare `status` with the picture from step 1 — `--working-tree` reads the backlog and history as this pass left them, where plain `status` would read the default branch's and show no change at all: every row still in the backlog keeps its state, and every row removed was done. A row that changed state means something it depended on was retired; restore it before going further.
 
 Report in [plain names](../../workflow/WORKFLOW.md#plain-names): how many plans and changes were compacted and how many lines removed, which were superseded or dropped and why, where each promoted decision and fact now lives, which deferred tickets became rows, what the backlog retired, and what was kept and why. Committing and opening the pull request stay the user's call; the commit message says what was compacted, since the diff is mostly deletions.
 

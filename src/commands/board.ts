@@ -21,6 +21,11 @@ export interface LoadedRegister {
 
 const sameText = (a: string, b: string) => a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n');
 
+export interface RegisterOptions {
+  /** Read this checkout's files even when the default branch has them: for checking a draft. */
+  workingTree?: boolean;
+}
+
 /**
  * Loads the register from the configured backlog, plus a decisions source when
  * declared, plus the questions the delivery history records as settled — a
@@ -28,14 +33,15 @@ const sameText = (a: string, b: string) => a.replace(/\r\n/g, '\n') === b.replac
  *
  * All three are read from the default branch on the remote, as claims are and
  * as a claim's branch is cut: a checkout behind it, or one drafting backlog
- * edits, would otherwise offer rows nobody else can see. Only outside Git, or
- * with no such remote branch, is this checkout's copy the register.
+ * edits, would otherwise offer rows nobody else can see. Only outside Git,
+ * with no such remote branch, or when asked for a draft, is this checkout's
+ * copy the register.
  */
-export function loadRegister(root: string, config: Config): LoadedRegister {
+export function loadRegister(root: string, config: Config, options: RegisterOptions = {}): LoadedRegister {
   if (!config.backlog) return { register: Register.empty(), ref: null, backlogDiffers: false };
   const git = new Git(root);
   const main = `${config.git.remote}/${config.git.defaultBranch}`;
-  const ref = git.available && git.hasCommit(main) ? main : null;
+  const ref = !options.workingTree && git.available && git.hasCommit(main) ? main : null;
   const fromDisk = (path: string) => readTextOrNull(inRoot(root, path));
   // `./` resolves the path from the root, which need not be the top of the repository.
   const read = (path: string) => (ref === null || isAbsolute(path) ? fromDisk(path) : git.show(ref, `./${path}`));
@@ -71,14 +77,27 @@ export interface BoardRead {
 }
 
 /** The board, and how current it is. */
-export function readBoard(root: string, config: Config, options: { fetch?: boolean } = {}): BoardRead {
+export function readBoard(
+  root: string,
+  config: Config,
+  options: { fetch?: boolean } & RegisterOptions = {},
+): BoardRead {
   const claims = new Claims(root, config.git, config.plans, config.repositories);
   // Fetch first: the register is read from the remote's default branch too.
   const fetchFailures = options.fetch === false ? [] : claims.fetch();
-  const loaded = loadRegister(root, config);
+  const loaded = loadRegister(root, config, options);
   const board = Board.build(loaded.register, claims.read({ fetch: false }), config.git.defaultBranch);
   const behind = loaded.ref === null ? 0 : (new Git(root).countAhead('HEAD', loaded.ref) ?? 0);
-  return { board, freshness: { ref: loaded.ref, behind, backlogDiffers: loaded.backlogDiffers, fetchFailures } };
+  return {
+    board,
+    freshness: {
+      ref: loaded.ref,
+      workingTree: options.workingTree === true,
+      behind,
+      backlogDiffers: loaded.backlogDiffers,
+      fetchFailures,
+    },
+  };
 }
 
 export function buildBoard(root: string, config: Config, options: { fetch?: boolean } = {}): Board {
@@ -87,7 +106,10 @@ export function buildBoard(root: string, config: Config, options: { fetch?: bool
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const { board, freshness } = readBoard(root, config, { fetch: !flagBool(args, 'no-fetch') });
+  const { board, freshness } = readBoard(root, config, {
+    fetch: !flagBool(args, 'no-fetch'),
+    workingTree: flagBool(args, 'working-tree'),
+  });
   const warnings = notices(freshness, config.backlog);
   const lane = normalizeLane(flagString(args, 'lane'), board.register);
   const count = Number.parseInt(flagString(args, 'count') ?? '3', 10) || 3;
@@ -111,7 +133,12 @@ export async function run(args: Args): Promise<number> {
             blockers: row.blockers,
           })),
           proposals: board.proposals({ lane, count }).map((row) => row.row.slug),
-          source: { ref: freshness.ref, behind: freshness.behind, backlogDiffers: freshness.backlogDiffers },
+          source: {
+            ref: freshness.ref,
+            workingTree: freshness.workingTree,
+            behind: freshness.behind,
+            backlogDiffers: freshness.backlogDiffers,
+          },
           fetchFailures: freshness.fetchFailures.map((failure) => ({
             repository: failure.repository,
             remote: failure.remote,
