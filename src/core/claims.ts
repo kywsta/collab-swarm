@@ -117,11 +117,22 @@ export class Claims {
    * so the board, are only as current as its last fetch.
    */
   fetch(): FetchFailure[] {
-    const failures: FetchFailure[] = [];
+    const own = this.fetchOwn();
+    return [...(own === null ? [] : [own]), ...this.fetchRepositories()];
+  }
+
+  /** Fetches this repository alone; the failure, or null. */
+  fetchOwn(): FetchFailure | null {
     const remote = this.git_config.remote;
     if (this.git.available && this.git.hasRemote(remote) && !this.git.fetch(remote)) {
-      failures.push({ repository: null, remote, lastFetchedAt: this.git.fetchedAt() });
+      return { repository: null, remote, lastFetchedAt: this.git.fetchedAt() };
     }
+    return null;
+  }
+
+  /** Fetches each code repository checked out here; the ones that failed. */
+  fetchRepositories(): FetchFailure[] {
+    const failures: FetchFailure[] = [];
     for (const repository of this.handles.values()) {
       if (repository.checkedOut && !repository.fetch()) {
         failures.push({

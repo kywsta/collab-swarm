@@ -1,6 +1,6 @@
 import { isAbsolute } from 'node:path';
 import { flagBool, flagString, type Args } from '../cli.js';
-import { inRoot, loadConfig, type Config } from '../config.js';
+import { CONFIG_FILE, inRoot, loadConfig, parseConfig, type Config } from '../config.js';
 import { Board, normalizeLane } from '../core/board.js';
 import { Claims } from '../core/claims.js';
 import { notices, type Freshness } from '../core/freshness.js';
@@ -71,9 +71,61 @@ export function loadRegister(root: string, config: Config, options: RegisterOpti
   };
 }
 
+/** What the board takes from the configuration: where its files are, and how claims are named. */
+const boardSettings = (config: Config) => ({
+  backlog: config.backlog,
+  plans: config.plans,
+  sources: config.sources,
+  repositories: config.repositories,
+  branchPrefix: config.git.branchPrefix,
+});
+
+/**
+ * The configuration the board runs on. Its settings come from the default
+ * branch's collab-swarm.yml, like the files they name, so a checkout behind a
+ * restructure reads the board that branch describes. The remote and the
+ * default branch, which say where to look, are this checkout's.
+ */
+export function boardConfig(
+  root: string,
+  config: Config,
+  options: RegisterOptions = {},
+): { config: Config; differs: string[] } {
+  const unchanged = { config, differs: [] };
+  if (options.workingTree) return unchanged;
+  const git = new Git(root);
+  const main = `${config.git.remote}/${config.git.defaultBranch}`;
+  if (!git.available || !git.hasCommit(main)) return unchanged;
+  const text = git.show(main, `./${CONFIG_FILE}`);
+  if (text === null) return unchanged;
+  let theirs: Config;
+  try {
+    theirs = parseConfig(text);
+  } catch {
+    // A broken file there is `validate`'s to report; the board still has this checkout's.
+    return unchanged;
+  }
+  const effective: Config = {
+    ...config,
+    backlog: theirs.backlog,
+    plans: theirs.plans,
+    sources: theirs.sources,
+    repositories: theirs.repositories,
+    git: { ...config.git, branchPrefix: theirs.git.branchPrefix },
+  };
+  const mine = boardSettings(config);
+  const followed = boardSettings(effective);
+  const differs = (Object.keys(mine) as (keyof typeof mine)[]).filter(
+    (key) => JSON.stringify(mine[key]) !== JSON.stringify(followed[key]),
+  );
+  return { config: effective, differs };
+}
+
 export interface BoardRead {
   board: Board;
   freshness: Freshness;
+  /** The configuration the board was read with: see `boardConfig`. */
+  config: Config;
 }
 
 /** The board, and how current it is. */
@@ -82,18 +134,23 @@ export function readBoard(
   config: Config,
   options: { fetch?: boolean } & RegisterOptions = {},
 ): BoardRead {
-  const claims = new Claims(root, config.git, config.plans, config.repositories);
-  // Fetch first: the register is read from the remote's default branch too.
-  const fetchFailures = options.fetch === false ? [] : claims.fetch();
-  const loaded = loadRegister(root, config, options);
+  const fetch = options.fetch !== false;
+  // Fetch first: the configuration and the register are read from the remote's default branch too.
+  const own = fetch ? new Claims(root, config.git, config.plans).fetchOwn() : null;
+  const settings = boardConfig(root, config, options);
+  const claims = new Claims(root, settings.config.git, settings.config.plans, settings.config.repositories);
+  const fetchFailures = [...(own === null ? [] : [own]), ...(fetch ? claims.fetchRepositories() : [])];
+  const loaded = loadRegister(root, settings.config, options);
   const board = Board.build(loaded.register, claims.read({ fetch: false }), config.git.defaultBranch);
   const behind = loaded.ref === null ? 0 : (new Git(root).countAhead('HEAD', loaded.ref) ?? 0);
   return {
     board,
+    config: settings.config,
     freshness: {
       ref: loaded.ref,
       workingTree: options.workingTree === true,
       behind,
+      configDiffers: settings.differs,
       backlogDiffers: loaded.backlogDiffers,
       fetchFailures,
     },
@@ -106,11 +163,12 @@ export function buildBoard(root: string, config: Config, options: { fetch?: bool
 
 export async function run(args: Args): Promise<number> {
   const { config, root } = loadConfig();
-  const { board, freshness } = readBoard(root, config, {
+  const read = readBoard(root, config, {
     fetch: !flagBool(args, 'no-fetch'),
     workingTree: flagBool(args, 'working-tree'),
   });
-  const warnings = notices(freshness, config.backlog);
+  const { board, freshness } = read;
+  const warnings = notices(freshness, read.config.backlog);
   const lane = normalizeLane(flagString(args, 'lane'), board.register);
   const count = Number.parseInt(flagString(args, 'count') ?? '3', 10) || 3;
 
@@ -137,6 +195,7 @@ export async function run(args: Args): Promise<number> {
             ref: freshness.ref,
             workingTree: freshness.workingTree,
             behind: freshness.behind,
+            configDiffers: freshness.configDiffers,
             backlogDiffers: freshness.backlogDiffers,
           },
           fetchFailures: freshness.fetchFailures.map((failure) => ({

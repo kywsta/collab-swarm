@@ -19,6 +19,8 @@ export interface Freshness {
   workingTree: boolean;
   /** Commits on `ref` that this checkout's HEAD does not have. */
   behind: number;
+  /** Settings the board reads from the default branch's configuration that this checkout's sets otherwise. */
+  configDiffers: string[];
   /** The working tree's backlog is not the one the board reads. */
   backlogDiffers: boolean;
   fetchFailures: FetchFailure[];
@@ -42,6 +44,12 @@ export function notices(freshness: Freshness, backlog: string | null): string[] 
   }
   const ref = freshness.ref;
   if (ref !== null && freshness.behind > 0) lines.push(`${behindBy(ref, freshness.behind)}; the board reads ${ref}.`);
+  if (ref !== null && freshness.configDiffers.length > 0) {
+    lines.push(
+      `This checkout's collab-swarm.yml differs from ${ref}'s in ${freshness.configDiffers.join(', ')}; ` +
+        `the board follows ${ref}'s.`,
+    );
+  }
   if (ref !== null && freshness.backlogDiffers) {
     lines.push(
       `This checkout's ${backlog} differs from ${ref}'s; the board reads ${ref}'s. ` +

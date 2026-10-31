@@ -12,9 +12,10 @@ export async function run(args: Args): Promise<number> {
     throw new CliError('Name the row to claim.', 64, `Usage: ${PROGRAM} claim <slug>`);
   }
 
-  const { config, root } = loadConfig();
+  const { config: local, root } = loadConfig();
   const fetch = !flagBool(args, 'no-fetch');
-  const { board, freshness } = readBoard(root, config, { fetch });
+  // The branch is cut from the default branch, so the claim follows its configuration too.
+  const { board, freshness, config } = readBoard(root, local, { fetch });
   // Without a fetch, a rival claim pushed since the last one is invisible here.
   const failed = freshness.fetchFailures.find((failure) => failure.repository === null);
   if (failed) throw new CliError(unverifiableClaim(slug, failed), 1);

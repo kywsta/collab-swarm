@@ -77,9 +77,12 @@ describe('the board in a checkout behind the default branch', () => {
 
     git(base, 'clone', '--quiet', origin, stale);
 
-    // The project is restructured: one row retired, one added.
-    writeText(join(current, 'backlog.md'), backlog(['kept-row', 'new-row']));
-    git(current, 'commit', '--quiet', '-am', 'Restructure the backlog');
+    // The project is restructured: the backlog moves, one row retired, one added.
+    git(current, 'rm', '--quiet', 'backlog.md');
+    writeText(join(current, 'docs', 'backlog.md'), backlog(['kept-row', 'new-row']));
+    writeText(join(current, 'collab-swarm.yml'), CONFIG.replace('backlog: backlog.md', 'backlog: docs/backlog.md'));
+    git(current, 'add', '-A');
+    git(current, 'commit', '--quiet', '-m', 'Restructure the backlog');
     git(current, 'push', '--quiet');
     git(stale, 'fetch', '--quiet', 'origin');
   });
@@ -92,6 +95,16 @@ describe('the board in a checkout behind the default branch', () => {
     assert.equal(board.source.ref, 'origin/main');
     assert.equal(board.source.behind, 1);
     assert.deepEqual(board.fetchFailures, []);
+  });
+
+  it('finds the backlog where the default branch configures it, not where this checkout does', () => {
+    const board = JSON.parse(swarm(stale, 'status', '--json').stdout);
+    assert.deepEqual(board.source.configDiffers, ['backlog']);
+    assert.match(
+      swarm(stale, 'status').stdout,
+      /This checkout's collab-swarm\.yml differs from origin\/main's in backlog; the board follows origin\/main's\./,
+    );
+    assert.deepEqual(JSON.parse(swarm(current, 'status', '--json').stdout).source.configDiffers, []);
   });
 
   it('says the checkout is behind, near the top of status and next', () => {
@@ -119,13 +132,13 @@ describe('the board in a checkout behind the default branch', () => {
   });
 
   it('keeps the default branch backlog while this checkout drafts edits, and says so', () => {
-    writeText(join(current, 'backlog.md'), backlog(['kept-row', 'new-row', 'drafted-row']));
+    writeText(join(current, 'docs', 'backlog.md'), backlog(['kept-row', 'new-row', 'drafted-row']));
     try {
       const json = JSON.parse(swarm(current, 'status', '--json').stdout);
       assert.deepEqual(json.rows.map((row) => row.slug), ['kept-row', 'new-row']);
       assert.equal(json.source.backlogDiffers, true);
       assert.equal(json.source.behind, 0);
-      assert.match(swarm(current, 'status').stdout, /This checkout's backlog\.md differs from origin\/main's; the board reads origin\/main's\./);
+      assert.match(swarm(current, 'status').stdout, /This checkout's docs\/backlog\.md differs from origin\/main's; the board reads origin\/main's\./);
       assert.match(swarm(current, 'status').stdout, /--working-tree/);
 
       // Whoever drafts it checks the draft the way the board will read it once merged.
@@ -135,7 +148,7 @@ describe('the board in a checkout behind the default branch', () => {
       assert.equal(draft.source.workingTree, true);
       assert.equal(draft.source.backlogDiffers, false);
       const text = swarm(current, 'next', '--working-tree');
-      assert.match(text.stdout.split('\n').find((line) => line.trim() !== ''), /reads this checkout's backlog\.md/);
+      assert.match(text.stdout.split('\n').find((line) => line.trim() !== ''), /reads this checkout's docs\/backlog\.md/);
       assert.match(text.stdout, /drafted-row/);
 
       // A claim is cut from the default branch, so it never reads a draft.
@@ -143,7 +156,7 @@ describe('the board in a checkout behind the default branch', () => {
       assert.equal(claim.code, 1, claim.all);
       assert.match(claim.all, /"drafted-row" is not in the feature register/);
     } finally {
-      git(current, 'checkout', '--quiet', '--', 'backlog.md');
+      git(current, 'checkout', '--quiet', '--', 'docs/backlog.md');
     }
     assert.equal(JSON.parse(swarm(current, 'status', '--json').stdout).source.backlogDiffers, false);
   });
