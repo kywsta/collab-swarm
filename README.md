@@ -2,6 +2,30 @@
 
 **Spec-driven delivery for humans and coding agents working as a swarm.**
 
+## Set up a new project
+
+Paste this to your coding agent at the root of the repository:
+
+```text
+Set up collab-swarm (https://github.com/kywsta/collab-swarm) in this repository.
+
+1. Ask me which coding agents work on this repository: claude, agents, codex,
+   cursor, opencode, antigravity. Suggest claude and agents if I don't know.
+2. Look for an API contract or design specs here. If there is one, ask me
+   whether this repository defines it or consumes it from elsewhere. If it has
+   Git submodules, tell me init will coordinate them as its code repositories.
+3. Install it: npm install -D github:kywsta/collab-swarm#v0.3.0
+4. Run init without prompts, passing my answers:
+   npx collab-swarm init --yes --target <ids> [--owns api,design]
+5. Open collab-swarm.yml and run every command under `checks:`. Fix or remove
+   any that does not run here, then run npx collab-swarm sync.
+6. Run npx collab-swarm doctor and npx collab-swarm validate, and fix what
+   they report.
+7. Show me what was written and what to fill in next (the backlog), and ask
+   before committing.
+8. Offer to research the rule set for this repository with the to-rules skill.
+```
+
 A team of people and a swarm of agents share one backlog, one plan format, and one set of checks. Git is the only tracker: a branch claims a feature, a completed plan on the default branch marks it done. Everyone — and every agent, in every tool — sees the same board after one fetch.
 
 Language and framework agnostic. Each repository's conventions are researched from its own code into a rule set; packs are optional baselines.
