@@ -11,7 +11,23 @@ The feature register in the project's backlog file is the list of work, and Git 
 
 The mechanics live in `npx collab-swarm`; this skill runs them and presents the result. It writes no feature code: a claimed row goes to `deliver-change`.
 
-## 1. Read the board
+## 1. Catch up
+
+Before reading anything, bring the checkout up to date from the repository root:
+
+```bash
+npx collab-swarm pull
+```
+
+The board reads the default branch on the remote, but everything else you read reads this checkout: the backlog for a row's wording, the plans for what was decided, the code for what exists. A checkout left behind by work merged from other branches shows finished rows as open, and you would propose them. `pull` fetches and fast-forwards this checkout to the remote default branch and, in a [hub](../../workflow/WORKFLOW.md#code-repositories), each code repository checked out here to its own default branch, moving a detached submodule onto it. Wherever moving could disturb work — a feature branch checked out, uncommitted changes, commits the remote lacks — it leaves the checkout exactly as it is and moves only the local default branch, when that is a fast-forward nobody else has checked out. It never merges, rebases, stashes or commits.
+
+Relay only what the user must act on: a checkout left as it is, a repository not checked out (with the command it prints), a fetch that failed. Say nothing when everything was updated or already current. A code repository now ahead of the commit the hub records is expected; leave the pointer uncommitted unless the user asks.
+
+When a checkout was left as it is, it still trails the default branch: read a row's wording from the board's output, not from that checkout's backlog or plans.
+
+Done when `pull` has run and anything it left behind is in hand.
+
+## 2. Read the board
 
 Run one command from the repository root:
 
@@ -26,7 +42,7 @@ The tool derives every row's state: **done** (plan complete on the default branc
 
 Done when the command has run and its output is in hand. If it fails, report the error verbatim; do not reconstruct the board by hand. When the project has no backlog file yet, or its register holds no rows, say so and offer `to-backlog`, which writes one from the project's sources.
 
-## 2. Present it
+## 3. Present it
 
 Relay the output in [plain names](../../workflow/WORKFLOW.md#plain-names), in this order, skipping empty parts. The tool prints each gate's title and owner, each milestone's name, and each decision's question beside their ids; carry those names into every bullet and let the id trail in parentheses:
 
@@ -39,7 +55,7 @@ Never propose a row the tool lists as claimed or blocked. When the output looks 
 
 Done when the user can choose by reading three bullets that make sense without the backlog open.
 
-## 3. Claim on pick
+## 4. Claim on pick
 
 When the user picks a row ("start 2", "let's do guest-home", "I'll take it"), the working tree must be clean; then:
 

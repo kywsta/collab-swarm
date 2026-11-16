@@ -85,6 +85,7 @@ ${style.bold('Set up')}
   doctor                   Check the installation and report what is missing
 
 ${style.bold('Deliver')}
+  pull                     Fast-forward this checkout, and a hub's code repositories, to their default branches
   status [--lane <lane>]   The delivery board: done, in progress, available, blocked
   next [--lane <lane>]     The best unclaimed rows, ranked
   claim <slug>             Claim a row by pushing its branch with a plan skeleton
@@ -115,6 +116,8 @@ async function dispatch(args: Args): Promise<number> {
       return (await import('./commands/sync.js')).run(args);
     case 'validate':
       return (await import('./commands/validate.js')).run(args);
+    case 'pull':
+      return (await import('./commands/pull.js')).run(args);
     case 'status':
     case 'next':
       return (await import('./commands/board.js')).run(args);

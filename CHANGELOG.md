@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **`whats-next` catches up before it reads the board.** The board already read the default branch on the remote, but the agent presenting it read this checkout — the backlog for a row's wording, the plans, the code — so a checkout behind work merged from other branches still proposed rows that were finished.
+  - **`npx collab-swarm pull`.** Fetches and fast-forwards this checkout to its remote default branch and, in a hub, each code repository checked out here to its own default branch, putting a detached submodule on that branch. A checkout on a feature branch, with uncommitted changes, or with commits the remote lacks is left exactly as it is; only its local default branch moves, when that is a fast-forward and no other worktree has it checked out. It never merges, rebases, stashes or commits. It names a repository that is not checked out, with the command that fixes it, and a code repository now ahead of the commit the hub records. `--json` for agents.
+  - `whats-next` runs it first, relays only what was left behind, and reads a row's wording from the board when a checkout could not be moved.
+
 ## 0.3.0
 
 - **The board reads the default branch, and says when it cannot be trusted.** Claims were read from the remote, but the backlog, the decisions source and the delivery history were read from the working tree, so a checkout behind the default branch — a reused worktree, a long-lived feature branch — showed a backlog from before the project changed next to today's claims, and a fetch that failed left the board silently out of date.

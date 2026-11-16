@@ -607,7 +607,8 @@ describe('step map', () => {
 
   it('collects the swarm commands a step involves', () => {
     assert.ok(skill('implement').steps[2].commands.includes('npx collab-swarm check --focus <ticket test path>'));
-    assert.ok(skill('whats-next').steps[0].commands.includes('npx collab-swarm next --lane "Dev 2"'));
+    assert.ok(skill('whats-next').steps[0].commands.includes('npx collab-swarm pull'));
+    assert.ok(skill('whats-next').steps[1].commands.includes('npx collab-swarm next --lane "Dev 2"'));
   });
 
   it('still reads a command written with the older bin name', () => {
