@@ -233,6 +233,7 @@ npx collab-swarm pack new <name>         # scaffold a pack to share a stack acro
 npx collab-swarm packs                   # what each installed pack contributes
 npx collab-swarm steps [<skill>]         # what each skill does, step by step, and the rules in force
 
+npx collab-swarm pull                    # fast-forward this checkout, and a hub's code repositories, where no work is in the way
 npx collab-swarm status [--lane <lane>]  # the board: done, in progress, available, blocked
 npx collab-swarm next [--lane <lane>]    # the best unclaimed rows, ranked
 npx collab-swarm claim <slug>            # take a row: pushes its branch with a plan skeleton
@@ -246,7 +247,7 @@ npx collab-swarm check [--focus <path>]  # your configured checks, in order; --r
 npx collab-swarm doctor                  # what is installed, stale, or missing
 ```
 
-`status`, `next`, `repos`, `rules`, `history`, `impact`, `packs`, `steps` and `validate` accept `--json`.
+`pull`, `status`, `next`, `repos`, `rules`, `history`, `impact`, `packs`, `steps` and `validate` accept `--json`.
 
 The board reads the backlog, decisions and history — and the settings in `collab-swarm.yml` that locate them — from the remote's default branch, where claims are cut from, so every checkout sees the same one however far behind it is; `status` and `next` say when this checkout is behind, or when a fetch failed. `--working-tree` reads this checkout's backlog instead, to check a draft before it merges.
 
