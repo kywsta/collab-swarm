@@ -132,6 +132,10 @@ export function renderMemoryBlock(context: EmitContext, workflowRoot: string): s
         ],
         ['`Resume the <slug> plan`', 'Continues from the stage recorded in `plan.yml`'],
         [
+          '`How does <X> work?` / `Where is <X>?`',
+          '`quick-question` answers from the records and the code, every claim cited to a line it read; it changes nothing',
+        ],
+        [
           '`Fix <small thing>` / `Change <small thing>`',
           '`small-change` states a short contract, asks whether to record it, builds it test-first, and reviews it against that contract; anything bigger goes to a plan',
         ],
