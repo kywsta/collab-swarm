@@ -68,6 +68,7 @@ And the skills that produce and consume them, in the place each of your agents a
 | *"Make a plan to implement password recovery"* | Grounds it in your sources, designs it against your codebase, splits it into vertical tickets — then stops for your review |
 | *"Implement the plan"* | Runs tickets in dependency order, test-first, verifying each with your checks, then reviews the whole diff |
 | *"Resume the password-recovery plan"* | Picks up from the stage recorded in `plan.yml` |
+| *"How does auth work?"* / *"How long does the token last?"* | Answers from the project's records and its code, every claim cited to a line it read: the answer first, then a table, steps or a diagram — and says where the records and the code disagree. Reads only |
 | *"Show a zero price as Free"* | Too small to plan: states a short contract, asks whether to record it, builds it test-first, and reviews the diff against that contract — off the board, no plan |
 | *"Research the rule set for api"* | Reads the repository and the official guidance for the versions it uses, proposes the conventions it is built by with their evidence, and writes the ones you agree — again whenever the code has moved on |
 | *"Compact the project history"* | Folds finished and superseded plans into one short delivery history, promotes what still matters, retires delivered milestones from the backlog — and deletes nothing you have not agreed to |
@@ -424,6 +425,20 @@ Steps
 `steps --rules` inverts it — for each rule, every step it governs and the file that brought it into force. That is the shortest path to *why did it do that?*: a rule reaches a step either because the step writes a file inside the rule's globs, or because the rule names the skill as its recipe, and the map says which.
 
 Nothing is recorded to produce any of this. The map is read from the payload in your checkout, so it describes the skills you actually have, including everything your packs added — and the workflow keeps [no event log](assets/workflow/WORKFLOW.md), by design. It tells you what an agent is instructed to do, not what one did.
+
+## Asking about the project
+
+Ask your agent *"how does auth work?"* or *"how long does the token last?"* and `quick-question` answers it: the answer in a sentence, then a table for a value and what overrides it, numbered steps and an arrow diagram for a flow, or a table of callers for an impact question. It reads the project's own records first — the vocabulary, the architecture decisions, the delivery history, the API contract — then the code, and cites every claim to a line it read. Where a record says one thing and the code does another, the answer says so. It changes nothing.
+
+It needs no index. When a repository has a [graphify](https://github.com/Graphify-Labs/graphify) code graph, it uses the graph to find the right files before reading them, which helps most on flow and impact questions in a large codebase; a value such as a token lifetime is still found in the code, since a graph records how code connects, not what it is set to. The graph is a map: an answer is never taken from it unread. To add one:
+
+```bash
+uv tool install graphifyy
+graphify extract . --code-only   # tree-sitter only: no LLM, nothing leaves the machine
+echo "graphify-out/" >> .gitignore
+```
+
+Keep `graphify-out/` out of Git, so each checkout builds the graph for its own branch, and run `graphify update .` after a pull. collab-swarm does not install graphify's own hooks: they steer every skill's searches and reads toward the graph, and `implement` and `code-review` must read the code itself. In a hub, build one graph in each code repository.
 
 ## When the requirements change
 
